@@ -1,83 +1,75 @@
-"use client"
+"use client"; // This is required for components that use client-side interactivity
 
-import { Bell, Home, MessageSquare, Search, User } from 'lucide-react'
-import Link from "next/link"
+import React from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  HomeIcon,
+  MessageCircleIcon,
+  BellIcon,
+  SettingsIcon,
+  LogOutIcon,
+} from "lucide-react";
+import Link from "next/link";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-//import { ScrollArea } from "@/components/ui/scroll-area"
-
-export function Sidebar() {
-    return (
-        <div className="hidden md:flex">
-            <div className="fixed inset-y-0 left-0 w-[300px] flex-col bg-white shadow-sm">
-                <div className="flex h-16 items-center border-b px-6">
-                    <div className="flex items-center gap-2">
-                        <Avatar>
-                            <AvatarImage src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot_20250117_200525-SEV6qpOTbHJWH9F716xcWtHGKu01r5.png" alt="User" />
-                            <AvatarFallback>PT</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium">ProjectTree Inc.</span>
-                            <span className="text-xs text-muted-foreground">Admin</span>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex-1 space-y-1 p-2">
-                    <div className="px-4 py-2">
-                        <form>
-                            <div className="relative">
-                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search" className="pl-8" />
-                            </div>
-                        </form>
-                    </div>
-                    <nav className="space-y-1 px-2">
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start gap-2"
-                            asChild
-                        >
-                            <Link href="/dashboard">
-                                <Home className="h-4 w-4" />
-                                Home
-                            </Link>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start gap-2"
-                            asChild
-                        >
-                            <Link href="/notifications">
-                                <Bell className="h-4 w-4" />
-                                Notifications
-                            </Link>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start gap-2"
-                            asChild
-                        >
-                            <Link href="/messages">
-                                <MessageSquare className="h-4 w-4" />
-                                Messages
-                            </Link>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start gap-2"
-                            asChild
-                        >
-                            <Link href="/profile">
-                                <User className="h-4 w-4" />
-                                Profile
-                            </Link>
-                        </Button>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    )
+interface SidebarProps {
+  currentUser: {
+    name: string;
+    email: string;
+    avatarUrl: string;
+  };
 }
 
+const Sidebar: React.FC<SidebarProps> = ({ currentUser }) => {
+  return (
+    <div className="w-64 bg-white dark:bg-gray-900 h-screen flex flex-col justify-between border-r border-gray-200 dark:border-gray-800">
+      {/* User Profile Section */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center space-x-4">
+          <Avatar>
+            <AvatarImage src={currentUser.avatarUrl} alt={currentUser.name} />
+            <AvatarFallback>{currentUser.name[0]}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+              {currentUser.name}
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {currentUser.email}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Links */}
+      <nav className="flex-1 px-4 py-6 space-y-2">
+        <Link href="/home" className="group flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <HomeIcon className="w-5 h-5 text-gray-500 group-hover:text-primary" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">Home</span>
+        </Link>
+        <Link href="/messages" className="group flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <MessageCircleIcon className="w-5 h-5 text-gray-500 group-hover:text-primary" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">Messages</span>
+        </Link>
+        <Link href="/notifications" className="group flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <BellIcon className="w-5 h-5 text-gray-500 group-hover:text-primary" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">Notifications</span>
+        </Link>
+        <Link href="/settings" className="group flex items-center space-x-3 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <SettingsIcon className="w-5 h-5 text-gray-500 group-hover:text-primary" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">Settings</span>
+        </Link>
+      </nav>
+
+      {/* Logout Button */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+        <Button variant="ghost" className="w-full justify-start">
+          <LogOutIcon className="w-5 h-5 mr-2" />
+          Logout
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;

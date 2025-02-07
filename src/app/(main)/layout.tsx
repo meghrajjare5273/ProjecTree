@@ -1,6 +1,6 @@
 
 import { Metadata } from "next"
-import { Sidebar } from "@/components/sidebar"
+//import SidebarLayout from "@/components/sidebar-layout"
 
 export const metadata: Metadata = {
     title: "Home | ProjecTree",
@@ -9,11 +9,13 @@ export const metadata: Metadata = {
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
     return (
+
         <div className="flex min-h-screen min-w-screen">
-            <Sidebar />
+            
             <main className="flex-1 md:ml-[300px]">
                 {children}
             </main>
+             
         </div>
 
     )

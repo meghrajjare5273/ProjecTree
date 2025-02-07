@@ -1,5 +1,6 @@
 "use client";
 
+import SidebarLayout from "@/components/sidebar-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { currentUser } from "@/lib/get-session";
 import { userSession } from "@/lib/types";
@@ -20,6 +21,7 @@ export default function Homepage() {
     }, []);
 
     return(
+        <SidebarLayout>
         <div className="p-4">
             {isLoading ? (
                 <div className="space-y-4">
@@ -34,5 +36,6 @@ export default function Homepage() {
                 </>
             )}
         </div>
+        </SidebarLayout> 
     )
 }
