@@ -76,6 +76,7 @@ model Event {
   date        DateTime
   location    String?
   organizer   String?
+  images      String[]
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments    Comment[]
