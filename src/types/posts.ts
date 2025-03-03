@@ -4,7 +4,7 @@ type User = {
     image?: string;
   };
   
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  
   type Comment = {
     id: string;
     content: string;
@@ -21,11 +21,11 @@ type User = {
     description: string;
     images: string[];
     tags: string[];
-    // userId: string;
-    // user: User;
-    // comments: Comment[];
+    userId: string;
+    user: User;
+    comments: Comment[];
     createdAt: Date;
-    // updatedAt: Date;
+    updatedAt: Date;
     type: "project"; // For distinguishing in combined posts array
   };
   
@@ -37,11 +37,11 @@ type User = {
     location: string | undefined;
     images: string[];
     organizer?: string;
-    // userId: string;
-    // user: User;
-    // comments: Comment[];
+    userId: string;
+    user: User;
+    comments: Comment[];
     createdAt: Date;
-    // updatedAt: Date;
+    updatedAt: Date;
     type: "event"; // For distinguishing in combined posts array
   };
   
