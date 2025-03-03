@@ -46,7 +46,7 @@ type ProfileUser = {
 export async function generateMetadata({
   params,
 }: {
-  params: { username: string };
+  params:{ username: string };
 }): Promise<Metadata> {
   const { username } = await params;
   const user = await prisma.user.findUnique({
@@ -76,7 +76,7 @@ function formatDate(date: Date) {
 export default async function UserProfilePage({
   params,
 }: {
-  params: { username: string };
+  params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
   const user = await prisma.user.findUnique({
