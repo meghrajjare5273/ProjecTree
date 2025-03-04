@@ -224,7 +224,7 @@ export default function UserProfilePage() {
                 No posts yet.
               </Text>
             ) : (
-              <VStack>
+              <VStack className="py-3">
                 {posts.map((post) => (
                   <motion.div
                     key={post.id}
