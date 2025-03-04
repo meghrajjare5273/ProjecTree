@@ -1,24 +1,24 @@
-// src/app/[username]/page.tsx
-/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client";
 
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
-import { ExtendedPost, ExtendedProject, ExtendedEvent } from "@/types/posts";
-import { motion } from "motion/react";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   Box,
-  Typography,
-  Card,
-  CardContent,
-  CardMedia,
-  CardActions,
+  Container,
+  Flex,
+  Heading,
+  Text,
   Avatar,
   Button,
-} from "@mui/material";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+  VStack,
+  Badge,
+  Image,
+  Spinner,
+} from "@chakra-ui/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { useRouter } from "next/navigation";
 
 // Animation Variants
 const containerVariants = {
@@ -31,389 +31,272 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
 
-// Define the type for the fetched user data
+// Define types for fetched data
 type ProfileUser = {
   id: string;
   name: string | null;
   username: string;
   image: string | null;
   bio: string | null;
-  socialLinks: Record<string, string> | null;
-  createdAt: Date;
+  socialLinks: Record<string, string>;
+  createdAt: string;
 };
 
-// Metadata generation for SEO
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ username: string }>;
-}): Promise<Metadata> {
-  const { username } = await params;
-  const user = await prisma.user.findUnique({
-    where: { username },
-    select: { name: true, username: true, bio: true },
+type ExtendedPost = {
+  id: string;
+  title: string;
+  description: string;
+  type: "project" | "event";
+  images?: string[];
+  tags?: string[];
+  date?: string;
+  location?: string;
+  createdAt: string;
+  commentCount: number;
+};
+
+type ProfileData = {
+  user: ProfileUser;
+  posts: ExtendedPost[];
+};
+
+// Fetcher function
+const fetchProfileData = async (username: string): Promise<ProfileData> => {
+  const response = await fetch(`/api/users/${username}`, {
+    credentials: "include",
   });
-
-  if (!user) {
-    return { title: "User not found - ProjecTree" };
+  if (!response.ok) {
+    throw new Error("Failed to fetch profile data");
   }
-
-  return {
-    title: `${user.name || user.username} (@${user.username}) - ProjecTree`,
-    description:
-      user.bio ||
-      `Profile of ${
-        user.name || user.username
-      } on ProjecTree. Explore their projects and events.`,
-  };
-}
+  return response.json();
+};
 
 // Helper function to format dates
-function formatDate(date: Date) {
-  return formatDistanceToNow(new Date(date), { addSuffix: true });
+function formatDate(dateString: string) {
+  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
 }
 
-export default async function UserProfilePage({
-  params,
-}: {
-  params: Promise<{ username: string }>;
-}) {
-  const { username } = await params;
-  const user = await prisma.user.findUnique({
-    where: { username },
-    select: {
-      id: true,
-      name: true,
-      username: true,
-      image: true,
-      bio: true,
-      socialLinks: true,
-      createdAt: true,
-    },
-  });
+export default function UserProfilePage() {
+  const router = useRouter();
+  const params = useParams();
+  const username = params.username as string;
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!user) {
-    notFound();
+  useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const data = await fetchProfileData(username);
+        setProfileData(data);
+        setLoading(false);
+      } catch (err) {
+        setError("User not found or an error occurred");
+        console.log(err);
+        setLoading(false);
+      }
+    };
+    loadProfileData();
+  }, [username]);
+
+  if (loading) {
+    return (
+      <Box
+        minH="100vh"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        bgGradient="linear(to-br, gray.900, gray.800)"
+      >
+        <Spinner size="xl" color="yellow.400" />
+      </Box>
+    );
   }
 
-  const [projects, events] = await prisma.$transaction([
-    prisma.project.findMany({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        images: true,
-        tags: true,
-        createdAt: true,
-        _count: { select: { comments: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.event.findMany({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        images: true,
-        date: true,
-        location: true,
-        organizer: true,
-        createdAt: true,
-        _count: { select: { comments: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  if (error || !profileData) {
+    return (
+      <Box
+        minH="100vh"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        bgGradient="linear(to-br, gray.900, gray.800)"
+      >
+        <Text color="yellow.400" fontSize="lg">
+          {error || "Profile not found"}
+        </Text>
+      </Box>
+    );
+  }
 
-  const projectsWithType: ExtendedProject[] = projects.map((project) => ({
-    ...project,
-    type: "project",
-    commentCount: project._count.comments,
-  }));
-
-  const eventsWithType: ExtendedEvent[] = events.map((event) => ({
-    ...event,
-    type: "event",
-    commentCount: event._count.comments,
-  }));
-
-  const posts: ExtendedPost[] = [...projectsWithType, ...eventsWithType].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-
-  const socialLinks = user.socialLinks
-    ? typeof user.socialLinks === "string"
-      ? JSON.parse(user.socialLinks)
-      : (user.socialLinks as Record<string, string>)
-    : {};
+  const { user, posts } = profileData;
 
   return (
-    <Box
-      className="relative z-10 flex flex-col items-center min-h-screen pt-20 pb-10"
-      sx={{ maxWidth: "1200px", mx: "auto", px: { xs: 2, md: 4 } }}
-    >
-      {/* Profile Header */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-full mb-8"
-        style={{
-          backgroundColor: "rgba(17, 24, 39, 0.7)",
-          backdropFilter: "blur(10px)",
-          padding: "2rem",
-          borderRadius: "1rem",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
-        }}
-      >
+    <Box bgGradient="linear(to-br, gray.900, gray.800)" minH="100vh" py={20}>
+      <Container maxW="5xl">
+        {/* Profile Header */}
         <motion.div
-          variants={itemVariants}
-          className="flex flex-col md:flex-row gap-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
         >
-          {/* FIX 1: Corrected Box component - moved md breakpoint into sx prop */}
-          <Box
-            display="flex"
-            alignItems="center"
-            flexDirection="column"
-            sx={{
-              md: { alignItems: "start" },
-            }}
-          >
-            <Avatar
-              src={user.image || "/default-avatar.png"}
-              sx={{
-                width: 120,
-                height: 120,
-                border: "2px solid #facc15",
-                mb: 2,
-              }}
-            />
-            <Typography
-              className="text-gray-400 text-center md:text-left"
-              sx={{ color: "#9ca3af !important" }}
-            >
-              Member since{" "}
-              {user.createdAt
-                ? new Date(user.createdAt).toLocaleDateString()
-                : "N/A"}
-            </Typography>
-          </Box>
-          <Box flex={1}>
-            <Typography
-              variant="h4"
-              className="font-bold"
-              sx={{ color: "white !important", mb: 1 }}
-            >
-              {user.name || user.username}
-            </Typography>
-            <Typography
-              className="text-gray-300"
-              sx={{ color: "#d1d5db !important", mb: 2 }}
-            >
-              @{user.username}
-            </Typography>
-            {user.bio && (
-              <Typography
-                className="text-gray-400"
-                sx={{ color: "#9ca3af !important", mb: 2 }}
-              >
-                {user.bio}
-              </Typography>
-            )}
-            <Box display="flex" gap={2} flexWrap="wrap">
-              {Object.entries(socialLinks).map(([platform, url]) => (
-                <Button
-                  key={platform}
-                  variant="outlined"
-                  size="small"
-                  component={Link}
-                  href={(url as string) || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{
-                    color: "#facc15 !important",
-                    borderColor: "rgba(250, 204, 21, 0.5)",
-                    "&:hover": {
-                      borderColor: "#facc15",
-                      backgroundColor: "rgba(250, 204, 21, 0.1)",
-                    },
-                  }}
-                >
-                  {platform}
-                </Button>
-              ))}
-              {/* FIX 2: Added proper href to Button component */}
-              <Button
-                variant="contained"
-                size="small"
-                href="#"
-                sx={{
-                  backgroundColor: "#facc15 !important",
-                  color: "#1f2937 !important",
-                  "&:hover": { backgroundColor: "#e5b813 !important" },
-                }}
-              >
-                Follow
-              </Button>
-            </Box>
+          <Box mb={8} bg="gray.800" p={6} borderRadius="xl" boxShadow="xl">
+            <Flex direction={{ base: "column", md: "row" }} gap={6}>
+              <Box>
+                <Avatar.Root size="xl">
+                  <Avatar.Fallback name={user.name || user.username} />
+                  <Avatar.Image src={user.image as string} />
+                </Avatar.Root>
+                <Text color="gray.400" mt={2}>
+                  Member since{" "}
+                  {user.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString()
+                    : "N/A"}
+                </Text>
+              </Box>
+              <Box flex={1}>
+                <Heading as="h1" size="xl" color="white">
+                  {user.name || user.username || "Anonymous"}
+                </Heading>
+                <Text color="yellow.400" mt={1}>
+                  @{user.username}
+                </Text>
+                {user.bio && (
+                  <Text color="gray.300" mt={2}>
+                    {user.bio}
+                  </Text>
+                )}
+                <Flex gap={2} mt={4} flexWrap="wrap">
+                  {Object.entries(user.socialLinks).map(([platform, url]) => (
+                    <Button
+                      key={platform}
+                      as="a"
+                      onClick={() => {
+                        router.push(url);
+                      }}
+                      // target="_blank"
+                      rel="noopener noreferrer"
+                      variant="outline"
+                      colorScheme="yellow"
+                      size="sm"
+                    >
+                      {platform}
+                    </Button>
+                  ))}
+                  <Button colorScheme="yellow" size="sm">
+                    Follow
+                  </Button>
+                </Flex>
+              </Box>
+            </Flex>
           </Box>
         </motion.div>
-      </motion.div>
 
-      {/* Posts Section */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-full max-w-3xl"
-        style={{
-          backgroundColor: "rgba(17, 24, 39, 0.7)",
-          backdropFilter: "blur(10px)",
-          padding: "2rem",
-          borderRadius: "1rem",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
-        }}
-      >
-        <Typography
-          variant="h5"
-          className="font-semibold mb-8 text-center"
-          sx={{
-            color: "white",
-            textShadow: "0px 2px 4px rgba(0, 0, 0, 0.3)",
-            letterSpacing: "0.05em",
-            position: "relative",
-            "&::after": {
-              content: '""',
-              position: "absolute",
-              bottom: "-10px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: "60px",
-              height: "3px",
-              background:
-                "linear-gradient(90deg, rgba(250,204,21,0.3) 0%, rgba(250,204,21,1) 50%, rgba(250,204,21,0.3) 100%)",
-              borderRadius: "10px",
-            },
-          }}
+        {/* Posts Section */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
         >
-          {user.name || user.username}&apos;s Posts
-        </Typography>
-        {posts.length === 0 ? (
-          <Typography
-            className="text-gray-400 text-center"
-            sx={{ color: "#9ca3af !important" }}
-          >
-            No posts yet.
-          </Typography>
-        ) : (
-          posts.map((post) => (
-            <motion.div key={post.id} variants={itemVariants}>
-              <Card
-                className="backdrop-blur-md rounded-2xl shadow-lg mb-6"
-                sx={{
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                  backgroundColor: "rgba(31, 41, 55, 0.85) !important",
-                  color: "white",
-                }}
-              >
-                <CardContent sx={{ backgroundColor: "transparent !important" }}>
-                  <Typography
-                    variant="h6"
-                    className="text-white font-bold"
-                    sx={{ color: "white !important" }}
+          <Box bg="gray.800" p={6} borderRadius="xl" boxShadow="xl">
+            <Heading
+              as="h2"
+              size="lg"
+              color="white"
+              mb={6}
+              textAlign="center"
+              position="relative"
+            >
+              {user.name || user.username}&apos;s Posts
+              <Box
+                position="absolute"
+                bottom="-10px"
+                left="50%"
+                transform="translateX(-50%)"
+                width="60px"
+                height="3px"
+                bgGradient="linear(to-r, yellow.400, yellow.400)"
+                borderRadius="10px"
+              />
+            </Heading>
+            {posts.length === 0 ? (
+              <Text color="gray.400" textAlign="center">
+                No posts yet.
+              </Text>
+            ) : (
+              <VStack>
+                {posts.map((post) => (
+                  <motion.div
+                    key={post.id}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: "spring", stiffness: 300 }}
                   >
-                    {post.title}{" "}
-                    <span
-                      className="text-yellow-400 text-sm"
-                      style={{ color: "#facc15" }}
+                    <Box
+                      w="full"
+                      bg="gray.700"
+                      p={4}
+                      borderRadius="lg"
+                      boxShadow="md"
                     >
-                      ({post.type})
-                    </span>
-                  </Typography>
-                  <Typography
-                    className="text-gray-300 mt-1"
-                    sx={{ color: "#d1d5db !important" }}
-                  >
-                    {post.description}
-                  </Typography>
-                  {post.images && post.images.length > 0 && (
-                    <CardMedia
-                      component="img"
-                      image={post.images[0]}
-                      alt={post.title}
-                      sx={{
-                        mt: 2,
-                        borderRadius: "8px",
-                        maxHeight: "200px",
-                        objectFit: "cover",
-                      }}
-                    />
-                  )}
-                  {post.type === "project" &&
-                    "tags" in post &&
-                    post.tags &&
-                    post.tags.length > 0 && (
-                      <Box display="flex" flexWrap="wrap" gap={1} mt={2}>
-                        {post.tags.slice(0, 3).map((tag) => (
-                          <Typography
-                            key={tag}
-                            className="text-xs bg-gray-700 rounded-full px-2 py-1"
-                            sx={{ color: "#d1d5db !important" }}
-                          >
-                            {tag}
-                          </Typography>
-                        ))}
-                        {post.tags.length > 3 && (
-                          <Typography
-                            className="text-xs bg-gray-700 rounded-full px-2 py-1"
-                            sx={{ color: "#d1d5db !important" }}
-                          >
-                            +{post.tags.length - 3}
-                          </Typography>
+                      <Heading as="h3" size="md" color="white">
+                        {post.title}{" "}
+                        <Text as="span" color="yellow.400">
+                          ({post.type})
+                        </Text>
+                      </Heading>
+                      <Text color="gray.300" mt={2}>
+                        {post.description}
+                      </Text>
+                      {post.images && post.images.length > 0 && (
+                        <Image
+                          src={post.images[0]}
+                          alt={post.title}
+                          borderRadius="md"
+                          mt={2}
+                          maxH="200px"
+                          objectFit="cover"
+                        />
+                      )}
+                      {post.type === "project" &&
+                        post.tags &&
+                        post.tags.length > 0 && (
+                          <Flex gap={2} mt={2}>
+                            {post.tags.slice(0, 3).map((tag) => (
+                              <Badge key={tag} colorScheme="yellow">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {post.tags.length > 3 && (
+                              <Badge colorScheme="yellow">
+                                +{post.tags.length - 3}
+                              </Badge>
+                            )}
+                          </Flex>
                         )}
-                      </Box>
-                    )}
-                  {post.type === "event" && "date" in post && post.date && (
-                    <Typography
-                      className="text-gray-400 mt-2"
-                      sx={{ color: "#9ca3af !important" }}
-                    >
-                      Date: {new Date(post.date).toLocaleDateString()}
-                      {"location" in post &&
-                        post.location &&
-                        ` | Location: ${post.location}`}
-                    </Typography>
-                  )}
-                  <Typography
-                    className="text-gray-400 mt-2"
-                    sx={{ color: "#9ca3af !important" }}
-                  >
-                    Posted {formatDate(post.createdAt)} | {post.commentCount}{" "}
-                    comments
-                  </Typography>
-                </CardContent>
-                <CardActions
-                  sx={{ p: 2, backgroundColor: "transparent !important" }}
-                >
-                  <Button
-                    className="text-yellow-400 hover:text-yellow-300"
-                    sx={{ color: "#facc15 !important" }}
-                    endIcon={<ArrowForwardIcon sx={{ color: "#facc15" }} />}
-                    component={Link}
-                    href={`/${post.type}s/${post.id}`}
-                  >
-                    View Details
-                  </Button>
-                </CardActions>
-              </Card>
-            </motion.div>
-          ))
-        )}
-      </motion.div>
+                      {post.type === "event" && post.date && (
+                        <Text color="gray.400" mt={2}>
+                          Date: {new Date(post.date).toLocaleDateString()}
+                          {post.location && ` | Location: ${post.location}`}
+                        </Text>
+                      )}
+                      <Text color="gray.400" mt={2}>
+                        Posted {formatDate(post.createdAt)} |{" "}
+                        {post.commentCount} comments
+                      </Text>
+                      <Link href={`/${post.type}s/${post.id}`}>
+                        <Button colorScheme="yellow" mt={2}>
+                          View Details
+                        </Button>
+                      </Link>
+                    </Box>
+                  </motion.div>
+                ))}
+              </VStack>
+            )}
+          </Box>
+        </motion.div>
+      </Container>
     </Box>
   );
 }

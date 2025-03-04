@@ -20,9 +20,9 @@ export default function DashboardLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <div className="min-h-screen relative flex flex-col overflow-hidden">
+        <div className="min-h-screen relative flex flex-col overflow-hidden !important">
           {/* Optimized Background Image with Gradient */}
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 " >
             <Image
               src="/pexels-enginakyurt-2943603.jpg"
               alt="Background"

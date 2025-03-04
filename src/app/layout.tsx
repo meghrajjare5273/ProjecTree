@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { constructMetadata } from "@/lib/seo";
 import "./globals.css";
 import { Inter } from "next/font/google";
+import { Provider } from "@/components/ui/provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -48,7 +49,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.className} antialiased`}
       >
-        {children}
+        <Provider>{children}</Provider>
         <SpeedInsights />
       </body>
     </html>
