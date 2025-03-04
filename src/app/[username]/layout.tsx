@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { Box, Flex } from "@chakra-ui/react";
-import { auth } from "@/lib/auth"; // Adjust based on your auth setup
-import NavLoggedIn from "@/components/nav-logged-in"; // Adjust to your logged-in nav component
-import Nav from "@/components/nav"; // Regular nav for non-logged-in users
+import { auth } from "@/lib/auth";
+import NavLoggedIn from "@/components/nav-logged-in";
+import Nav from "@/components/nav";
 import { Provider } from "@/components/ui/provider";
 
 export default async function UsernameLayout({
@@ -10,7 +10,6 @@ export default async function UsernameLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Fetch session server-side to determine login状态
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -19,10 +18,10 @@ export default async function UsernameLayout({
     <Provider>
       <Box
         minH="100vh"
-        bgImage="url(/pexels-thephotosaccount-30324061.jpg)" // Replace with your background image path
-        bgSize="cover"
+        backgroundImage="url(/pexels-thephotosaccount-30324061.jpg)"
+        backgroundSize="cover"
         backgroundPosition="center"
-        bgRepeat="no-repeat"
+        backgroundRepeat="no-repeat"
         position="relative"
         _before={{
           content: '""',
@@ -31,26 +30,27 @@ export default async function UsernameLayout({
           left: 0,
           right: 0,
           bottom: 0,
-          bg: "blackAlpha.700", // Dark overlay for readability
+          bg: "blackAlpha.700",
           zIndex: 1,
         }}
       >
         <Flex direction="column" minH="100vh" position="relative" zIndex={2}>
-          {/* Navigation */}
-          <Box as="header" bg="gray.900" py={4} px={6}>
+          {/* Navigation with explicit spacing */}
+          <Box as="header" bg="gray.900" py={4} px={6} margin={0}>
             {session ? <NavLoggedIn /> : <Nav />}
           </Box>
 
-          {/* Main Content */}
-          <Box as="main" flex={1} py={10}>
+          {/* Main Content with controlled spacing */}
+          <Box as="main" flex={1} py={10} px={0}>
             {children}
           </Box>
 
-          {/* Footer (Optional) */}
+          {/* Footer with explicit spacing */}
           <Box
             as="footer"
             bg="gray.900"
             py={4}
+            px={0}
             textAlign="center"
             color="gray.400"
           >
