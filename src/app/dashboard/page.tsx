@@ -66,7 +66,7 @@ const PostCard = memo(
                 border: "1px solid #facc15",
               }}
             />
-            <Link href={`/${post.user.username}`}>
+            <Link href={`users/${post.user.username}`}>
               <Typography
                 className="text-white font-medium"
                 sx={{ color: "white !important" }}
