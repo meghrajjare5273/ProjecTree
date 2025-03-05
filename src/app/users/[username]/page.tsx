@@ -44,36 +44,81 @@ import {
   Language,
 } from "@mui/icons-material";
 
-// Create a custom theme with more vibrant colors
+// Add generateMetadata function at the top of the file, before the component definitions
+// export async function generateMetadata({ params }: { params: { username: string } }) {
+//   const username = params.username
+
+//   return {
+//     title: `${username}'s Profile | Community Platform`,
+//     description: `View ${username}'s profile, projects, and events on our community platform.`,
+//     openGraph: {
+//       title: `${username}'s Profile | Community Platform`,
+//       description: `Check out ${username}'s contributions, projects, and upcoming events.`,
+//       type: "profile",
+//       images: [
+//         {
+//           url: "/og-profile-image.jpg",
+//           width: 1200,
+//           height: 630,
+//           alt: `${username}'s profile`,
+//         },
+//       ],
+//     },
+//     twitter: {
+//       card: "summary_large_image",
+//       title: `${username}'s Profile | Community Platform`,
+//       description: `View ${username}'s profile, projects, and events on our community platform.`,
+//       images: ["/og-profile-image.jpg"],
+//     },
+//   }
+// }
+
+// Update the theme with improved color scheme for better readability
 const theme = createTheme({
   palette: {
-    mode: "light",
+    mode: "dark",
     primary: {
-      main: "#3f51b5",
+      main: "#facc15", // Yellow accent color from dashboard
+      light: "#fde68a",
+      dark: "#f59e0b",
     },
     secondary: {
       main: "#f50057",
     },
     background: {
-      default: "#f5f7fa",
-      paper: "#ffffff",
+      default: "#111827", // Dark background
+      paper: "rgba(17, 24, 39, 0.8)", // Darker background for better contrast
     },
     warning: {
-      main: "#ff9800",
-      light: "#ffb74d",
-      dark: "#f57c00",
+      main: "#facc15", // Yellow accent color
+      light: "#fde68a",
+      dark: "#f59e0b",
     },
+    text: {
+      primary: "#ffffff",
+      secondary: "#d1d5db",
+    },
+    divider: "rgba(255, 255, 255, 0.12)",
   },
   typography: {
     fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
     h4: {
       fontWeight: 700,
+      color: "#ffffff",
     },
     h5: {
       fontWeight: 600,
+      color: "#ffffff",
     },
     h6: {
       fontWeight: 600,
+      color: "#ffffff",
+    },
+    body1: {
+      color: "#e2e8f0",
+    },
+    body2: {
+      color: "#cbd5e1",
     },
   },
   shape: {
@@ -87,7 +132,7 @@ const theme = createTheme({
           borderRadius: 8,
           boxShadow: "none",
           "&:hover": {
-            boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+            boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
           },
         },
       },
@@ -95,7 +140,39 @@ const theme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
+          backgroundColor: "rgba(17, 24, 39, 0.8)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: "rgba(17, 24, 39, 0.8)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          fontWeight: 500,
+        },
+        outlined: {
+          borderColor: "rgba(250, 204, 21, 0.5)",
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          color: "#d1d5db",
+          "&.Mui-selected": {
+            color: "#facc15",
+          },
         },
       },
     },
@@ -211,6 +288,7 @@ export default function UserProfilePage() {
           backgroundColor: "background.default",
           minHeight: "100vh",
           py: 4,
+          backgroundImage: "linear-gradient(to bottom, #0f172a, #111827)",
         }}
       >
         <Container maxWidth="lg">
@@ -248,30 +326,50 @@ function LoadingProfileSkeleton() {
             md={3}
             sx={{ display: "flex", justifyContent: "center" }}
           >
-            <Skeleton variant="circular" width={150} height={150} />
+            <Skeleton
+              variant="circular"
+              width={150}
+              height={150}
+              sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
+            />
           </Grid>
           <Grid item xs={12} md={9}>
-            <Skeleton variant="text" width="60%" height={60} />
-            <Skeleton variant="text" width="40%" height={30} sx={{ mb: 2 }} />
-            <Skeleton variant="text" width="80%" height={60} />
+            <Skeleton
+              variant="text"
+              width="60%"
+              height={60}
+              sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
+            />
+            <Skeleton
+              variant="text"
+              width="40%"
+              height={30}
+              sx={{ mb: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }}
+            />
+            <Skeleton
+              variant="text"
+              width="80%"
+              height={60}
+              sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
+            />
             <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
               <Skeleton
                 variant="rectangular"
                 width={100}
                 height={36}
-                sx={{ borderRadius: 1 }}
+                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
               />
               <Skeleton
                 variant="rectangular"
                 width={100}
                 height={36}
-                sx={{ borderRadius: 1 }}
+                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
               />
               <Skeleton
                 variant="rectangular"
                 width={100}
                 height={36}
-                sx={{ borderRadius: 1 }}
+                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
               />
             </Stack>
           </Grid>
@@ -283,7 +381,7 @@ function LoadingProfileSkeleton() {
           variant="text"
           width="40%"
           height={40}
-          sx={{ mx: "auto", mb: 3 }}
+          sx={{ mx: "auto", mb: 3, bgcolor: "rgba(255, 255, 255, 0.1)" }}
         />
         <Stack spacing={3}>
           {[1, 2, 3].map((item) => (
@@ -292,7 +390,7 @@ function LoadingProfileSkeleton() {
               variant="rectangular"
               width="100%"
               height={200}
-              sx={{ borderRadius: 2 }}
+              sx={{ borderRadius: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }}
             />
           ))}
         </Stack>
@@ -368,9 +466,11 @@ function ProfileContent({
           mb: 4,
           p: 4,
           borderRadius: 3,
-          background: "linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%)",
+          background:
+            "linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.95) 100%)",
           position: "relative",
           overflow: "hidden",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
         }}
       >
         <Box
@@ -381,7 +481,7 @@ function ProfileContent({
             width: "30%",
             height: "100%",
             background:
-              "linear-gradient(135deg, rgba(63, 81, 181, 0.05) 0%, rgba(63, 81, 181, 0.1) 100%)",
+              "linear-gradient(135deg, rgba(250, 204, 21, 0.05) 0%, rgba(250, 204, 21, 0.1) 100%)",
             clipPath: "polygon(100% 0, 0 0, 100% 100%)",
             zIndex: 0,
           }}
@@ -404,8 +504,8 @@ function ProfileContent({
               sx={{
                 width: 150,
                 height: 150,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-                border: "4px solid white",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                border: "4px solid rgba(250, 204, 21, 0.5)",
               }}
             />
             <Typography
@@ -437,28 +537,24 @@ function ProfileContent({
               <Box>
                 <Typography
                   variant="h4"
-                  color="primary"
                   sx={{
                     fontWeight: 700,
-                    background:
-                      "linear-gradient(90deg, #3f51b5 0%, #5c6bc0 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
+                    color: "#ffffff",
+                    textShadow: "0 2px 4px rgba(0,0,0,0.3)",
                   }}
                 >
                   {user.name || user.username || "Anonymous"}
                 </Typography>
                 <Typography
                   variant="subtitle1"
-                  color="text.secondary"
                   sx={{
                     display: "inline-block",
                     background:
-                      "linear-gradient(90deg, #ff9800 0%, #ffb74d 100%)",
+                      "linear-gradient(90deg, #facc15 0%, #fde68a 100%)",
                     padding: "2px 8px",
                     borderRadius: "4px",
-                    color: "white",
-                    fontWeight: 500,
+                    color: "#111827",
+                    fontWeight: 600,
                     mb: 2,
                   }}
                 >
@@ -473,7 +569,9 @@ function ProfileContent({
                 sx={{
                   borderRadius: "20px",
                   px: 3,
-                  boxShadow: "0 4px 12px rgba(63, 81, 181, 0.2)",
+                  boxShadow: "0 4px 12px rgba(250, 204, 21, 0.3)",
+                  color: "#111827",
+                  fontWeight: 600,
                 }}
               >
                 Follow
@@ -484,7 +582,7 @@ function ProfileContent({
               <Typography
                 variant="body1"
                 sx={{
-                  color: "text.primary",
+                  color: "#e2e8f0",
                   mt: 1,
                   mb: 3,
                   lineHeight: 1.6,
@@ -495,9 +593,9 @@ function ProfileContent({
               </Typography>
             )}
 
-            <Divider sx={{ my: 2 }} />
+            <Divider sx={{ my: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
 
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            <Typography variant="subtitle2" color="#d1d5db" gutterBottom>
               Connect with {user.name || user.username}
             </Typography>
 
@@ -518,7 +616,7 @@ function ProfileContent({
                     borderRadius: "20px",
                     textTransform: "capitalize",
                     "&:hover": {
-                      backgroundColor: "rgba(63, 81, 181, 0.08)",
+                      backgroundColor: "rgba(250, 204, 21, 0.1)",
                     },
                   }}
                 >
@@ -536,10 +634,11 @@ function ProfileContent({
         sx={{
           borderRadius: 3,
           overflow: "hidden",
-          background: "white",
+          background: "rgba(17, 24, 39, 0.95)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
         }}
       >
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "rgba(255, 255, 255, 0.1)" }}>
           <Tabs
             value={tabValue}
             onChange={handleTabChange}
@@ -547,6 +646,11 @@ function ProfileContent({
             textColor="primary"
             indicatorColor="primary"
             aria-label="profile content tabs"
+            sx={{
+              "& .MuiTabs-indicator": {
+                backgroundColor: "#facc15",
+              },
+            }}
           >
             <Tab label="All Posts" />
             <Tab label="Projects" />
@@ -577,10 +681,20 @@ function PostsTabContent({
   if (posts.length === 0) {
     return (
       <Box sx={{ py: 4, textAlign: "center" }}>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
+        <Typography color="#d1d5db" sx={{ mb: 2 }}>
           No posts to display in this category.
         </Typography>
-        <Button variant="outlined" color="primary">
+        <Button
+          variant="outlined"
+          color="primary"
+          sx={{
+            borderColor: "rgba(250, 204, 21, 0.5)",
+            "&:hover": {
+              borderColor: "#facc15",
+              backgroundColor: "rgba(250, 204, 21, 0.1)",
+            },
+          }}
+        >
           Create New Post
         </Button>
       </Box>
@@ -604,8 +718,11 @@ function PostsTabContent({
                 display: "flex",
                 flexDirection: "column",
                 transition: "all 0.3s ease",
+                backgroundColor: "rgba(17, 24, 39, 0.9)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
                 "&:hover": {
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                  borderColor: "rgba(250, 204, 21, 0.3)",
                 },
               }}
             >
@@ -620,23 +737,26 @@ function PostsTabContent({
                 <Box
                   sx={{
                     height: 140,
-                    backgroundColor:
+                    background:
                       post.type === "project"
-                        ? "primary.light"
-                        : "warning.light",
+                        ? "linear-gradient(135deg, rgba(250, 204, 21, 0.7) 0%, rgba(245, 158, 11, 0.7) 100%)"
+                        : "linear-gradient(135deg, rgba(250, 204, 21, 0.7) 0%, rgba(251, 191, 36, 0.7) 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "white",
+                    color: "#111827",
                   }}
                 >
-                  <Typography variant="h6">
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 700, color: "#111827" }}
+                  >
                     {post.type === "project" ? "Project" : "Event"}
                   </Typography>
                 </Box>
               )}
 
-              <CardContent sx={{ flexGrow: 1 }}>
+              <CardContent sx={{ flexGrow: 1, p: 3 }}>
                 <Box
                   sx={{
                     display: "flex",
@@ -655,6 +775,7 @@ function PostsTabContent({
                       WebkitBoxOrient: "vertical",
                       overflow: "hidden",
                       lineHeight: 1.3,
+                      color: "#ffffff",
                     }}
                   >
                     {post.title}
@@ -662,14 +783,20 @@ function PostsTabContent({
                   <Chip
                     label={post.type}
                     size="small"
-                    color={post.type === "project" ? "primary" : "warning"}
-                    sx={{ ml: 1, textTransform: "capitalize" }}
+                    color="primary"
+                    sx={{
+                      ml: 1,
+                      textTransform: "capitalize",
+                      color: "#111827",
+                      fontWeight: 600,
+                      backgroundColor:
+                        post.type === "project" ? "#facc15" : "#fbbf24",
+                    }}
                   />
                 </Box>
 
                 <Typography
                   variant="body2"
-                  color="text.secondary"
                   sx={{
                     mb: 2,
                     display: "-webkit-box",
@@ -677,6 +804,8 @@ function PostsTabContent({
                     WebkitBoxOrient: "vertical",
                     overflow: "hidden",
                     height: "4.5em",
+                    color: "#d1d5db",
+                    lineHeight: 1.6,
                   }}
                 >
                   {post.description}
@@ -700,7 +829,11 @@ function PostsTabContent({
                           size="small"
                           variant="outlined"
                           color="primary"
-                          sx={{ fontSize: "0.7rem" }}
+                          sx={{
+                            fontSize: "0.7rem",
+                            color: "#facc15",
+                            borderColor: "rgba(250, 204, 21, 0.5)",
+                          }}
                         />
                       ))}
                       {post.tags.length > 3 && (
@@ -708,7 +841,11 @@ function PostsTabContent({
                           label={`+${post.tags.length - 3}`}
                           size="small"
                           color="primary"
-                          sx={{ fontSize: "0.7rem" }}
+                          sx={{
+                            fontSize: "0.7rem",
+                            color: "#111827",
+                            backgroundColor: "#facc15",
+                          }}
                         />
                       )}
                     </Box>
@@ -718,10 +855,9 @@ function PostsTabContent({
                   <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                     <CalendarMonth
                       fontSize="small"
-                      color="action"
-                      sx={{ mr: 0.5 }}
+                      sx={{ mr: 0.5, color: "#facc15" }}
                     />
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: "#d1d5db" }}>
                       {new Date(post.date).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
@@ -731,19 +867,20 @@ function PostsTabContent({
 
                     {post.location && (
                       <>
-                        <Box component="span" sx={{ mx: 0.5 }}>
+                        <Box
+                          component="span"
+                          sx={{ mx: 0.5, color: "#d1d5db" }}
+                        >
                           •
                         </Box>
                         <LocationOn
                           fontSize="small"
-                          color="action"
-                          sx={{ mr: 0.5 }}
+                          sx={{ mr: 0.5, color: "#facc15" }}
                         />
                         <Typography
                           variant="body2"
-                          color="text.secondary"
                           noWrap
-                          sx={{ maxWidth: "120px" }}
+                          sx={{ maxWidth: "120px", color: "#d1d5db" }}
                         >
                           {post.location}
                         </Typography>
@@ -753,15 +890,21 @@ function PostsTabContent({
                 )}
               </CardContent>
 
-              <Divider />
+              <Divider sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }} />
 
-              <CardActions sx={{ justifyContent: "space-between", px: 2 }}>
-                <Typography variant="caption" color="text.secondary">
+              <CardActions
+                sx={{ justifyContent: "space-between", px: 3, py: 1.5 }}
+              >
+                <Typography variant="caption" sx={{ color: "#9ca3af" }}>
                   {formatDate(post.createdAt)}
                 </Typography>
 
                 <Box>
-                  <IconButton size="small" aria-label="comments">
+                  <IconButton
+                    size="small"
+                    aria-label="comments"
+                    sx={{ color: "#d1d5db" }}
+                  >
                     <Comment fontSize="small" />
                     <Typography variant="caption" sx={{ ml: 0.5 }}>
                       {post.commentCount}
@@ -769,7 +912,17 @@ function PostsTabContent({
                   </IconButton>
 
                   <Link href={`/${post.type}s/${post.id}`} passHref>
-                    <Button size="small" color="primary" sx={{ ml: 1 }}>
+                    <Button
+                      size="small"
+                      color="primary"
+                      sx={{
+                        ml: 1,
+                        color: "#facc15",
+                        "&:hover": {
+                          backgroundColor: "rgba(250, 204, 21, 0.1)",
+                        },
+                      }}
+                    >
                       View
                     </Button>
                   </Link>
