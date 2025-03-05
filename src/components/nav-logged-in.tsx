@@ -1,3 +1,5 @@
+//components/nav-logged-in.tsx
+
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
@@ -380,7 +382,7 @@ export default function NavbarLoggedIn() {
 
                 <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.1)" }} />
 
-                <MenuItem onClick={() => handleMenuAction(`/${user.username}`)}>
+                <MenuItem onClick={() => handleMenuAction(`users/${user.username}`)}>
                   <AccountCircle sx={{ mr: 2 }} /> My Profile
                 </MenuItem>
 
