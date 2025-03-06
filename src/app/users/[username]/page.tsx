@@ -44,35 +44,6 @@ import {
   Language,
 } from "@mui/icons-material";
 
-// Add generateMetadata function at the top of the file, before the component definitions
-// export async function generateMetadata({ params }: { params: { username: string } }) {
-//   const username = params.username
-
-//   return {
-//     title: `${username}'s Profile | Community Platform`,
-//     description: `View ${username}'s profile, projects, and events on our community platform.`,
-//     openGraph: {
-//       title: `${username}'s Profile | Community Platform`,
-//       description: `Check out ${username}'s contributions, projects, and upcoming events.`,
-//       type: "profile",
-//       images: [
-//         {
-//           url: "/og-profile-image.jpg",
-//           width: 1200,
-//           height: 630,
-//           alt: `${username}'s profile`,
-//         },
-//       ],
-//     },
-//     twitter: {
-//       card: "summary_large_image",
-//       title: `${username}'s Profile | Community Platform`,
-//       description: `View ${username}'s profile, projects, and events on our community platform.`,
-//       images: ["/og-profile-image.jpg"],
-//     },
-//   }
-// }
-
 // Update the theme with improved color scheme for better readability
 const theme = createTheme({
   palette: {
