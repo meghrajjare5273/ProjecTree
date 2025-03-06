@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { auth } from "@/lib/auth";
 import NavLoggedIn from "@/components/nav-logged-in";
 import Nav from "@/components/nav";
@@ -92,7 +92,7 @@ export default async function UsernameLayout({
         </Box>
 
         {/* Footer with explicit spacing */}
-        <Box
+        {/* <Box
           component="footer"
           sx={{
             backgroundColor: "rgb(17, 24, 39)", // equivalent to gray.900
@@ -105,7 +105,7 @@ export default async function UsernameLayout({
           <Typography variant="body2" color="inherit">
             © {new Date().getFullYear()} ProjecTree. All rights reserved.
           </Typography>
-        </Box>
+        </Box> */}
       </Box>
     </Box>
   );

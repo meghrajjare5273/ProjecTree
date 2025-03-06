@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-"use client";
+ 
+"use client"
 
-import type React from "react";
+import type React from "react"
 
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { useState, useEffect, useMemo } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Box,
   Container,
@@ -22,352 +23,1108 @@ import {
   CardMedia,
   CardActions,
   IconButton,
-  Skeleton,
-  ThemeProvider,
-  createTheme,
+  Tooltip,
   Tabs,
   Tab,
-} from "@mui/material";
-import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
-import { useRouter } from "next/navigation";
+  useMediaQuery,
+  useTheme,
+  Skeleton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material"
 import {
   Favorite,
+  FavoriteBorder,
   Comment,
+  CalendarToday,
   LocationOn,
-  CalendarMonth,
   GitHub,
   LinkedIn,
   Twitter,
-  Instagram,
-  Facebook,
   Language,
-} from "@mui/icons-material";
+  MoreVert,
+  Message,
+  PersonAdd,
+  PersonAddDisabled,
+  Flag,
+  BookmarkAdd,
+  Bookmark,
+} from "@mui/icons-material"
+import { formatDistanceToNow } from "date-fns"
+import Link from "next/link"
 
-// Update the theme with improved color scheme for better readability
-const theme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: "#facc15", // Yellow accent color from dashboard
-      light: "#fde68a",
-      dark: "#f59e0b",
-    },
-    secondary: {
-      main: "#f50057",
-    },
-    background: {
-      default: "#111827", // Dark background
-      paper: "rgba(17, 24, 39, 0.8)", // Darker background for better contrast
-    },
-    warning: {
-      main: "#facc15", // Yellow accent color
-      light: "#fde68a",
-      dark: "#f59e0b",
-    },
-    text: {
-      primary: "#ffffff",
-      secondary: "#d1d5db",
-    },
-    divider: "rgba(255, 255, 255, 0.12)",
-  },
-  typography: {
-    fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
-    h4: {
-      fontWeight: 700,
-      color: "#ffffff",
-    },
-    h5: {
-      fontWeight: 600,
-      color: "#ffffff",
-    },
-    h6: {
-      fontWeight: 600,
-      color: "#ffffff",
-    },
-    body1: {
-      color: "#e2e8f0",
-    },
-    body2: {
-      color: "#cbd5e1",
-    },
-  },
-  shape: {
-    borderRadius: 12,
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: "none",
-          borderRadius: 8,
-          boxShadow: "none",
-          "&:hover": {
-            boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-          },
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
-          backgroundColor: "rgba(17, 24, 39, 0.8)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          backgroundColor: "rgba(17, 24, 39, 0.8)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-        },
-      },
-    },
-    MuiChip: {
-      styleOverrides: {
-        root: {
-          fontWeight: 500,
-        },
-        outlined: {
-          borderColor: "rgba(250, 204, 21, 0.5)",
-        },
-      },
-    },
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          color: "#d1d5db",
-          "&.Mui-selected": {
-            color: "#facc15",
-          },
-        },
-      },
-    },
-  },
-});
-
-// Animation Variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.2 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-};
-
-// Types remain the same as in the original file
+// Types
 type ProfileUser = {
-  id: string;
-  name: string | null;
-  username: string;
-  image: string | null;
-  bio: string | null;
-  socialLinks: Record<string, string>;
-  createdAt: string;
-};
+  id: string
+  name: string | null
+  username: string
+  image: string | null
+  bio: string | null
+  socialLinks: Record<string, string>
+  createdAt: string
+}
 
 type ExtendedPost = {
-  id: string;
-  title: string;
-  description: string;
-  type: "project" | "event";
-  images?: string[];
-  tags?: string[];
-  date?: string;
-  location?: string;
-  createdAt: string;
-  commentCount: number;
-};
+  id: string
+  title: string
+  description: string
+  type: "project" | "event"
+  images?: string[]
+  tags?: string[]
+  date?: string
+  location?: string
+  createdAt: string
+  commentCount: number
+}
 
 type ProfileData = {
-  user: ProfileUser;
-  posts: ExtendedPost[];
-};
+  user: ProfileUser
+  posts: ExtendedPost[]
+}
 
 // Fetcher function
 const fetchProfileData = async (username: string): Promise<ProfileData> => {
   const response = await fetch(`/api/users/${username}`, {
     credentials: "include",
-  });
+  })
   if (!response.ok) {
-    throw new Error("Failed to fetch profile data");
+    throw new Error("Failed to fetch profile data")
   }
-  return response.json();
-};
-
-// Helper function to format dates
-function formatDate(dateString: string) {
-  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+  return response.json()
 }
 
-// Social icon mapper
-const getSocialIcon = (platform: string) => {
-  switch (platform.toLowerCase()) {
-    case "github":
-      return <GitHub />;
-    case "linkedin":
-      return <LinkedIn />;
-    case "twitter":
-      return <Twitter />;
-    case "instagram":
-      return <Instagram />;
-    case "facebook":
-      return <Facebook />;
-    default:
-      return <Language />;
-  }
-};
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2,
+      duration: 0.5,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      damping: 15,
+      stiffness: 100,
+    },
+  },
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      damping: 20,
+      stiffness: 100,
+    },
+  },
+  hover: {
+    y: -8,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+    transition: {
+      type: "spring",
+      damping: 15,
+      stiffness: 100,
+    },
+  },
+}
 
 export default function UserProfilePage() {
-  const router = useRouter();
-  const params = useParams();
-  const username = params.username as string;
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tabValue, setTabValue] = useState(0);
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
+  const isTablet = useMediaQuery(theme.breakpoints.down("md"))
+  const router = useRouter()
+  const params = useParams()
+  const username = params.username as string
 
+  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [tabValue, setTabValue] = useState(0)
+  const [following, setFollowing] = useState(false)
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null)
+  const [savedPosts, setSavedPosts] = useState<string[]>([])
+  const [likedPosts, setLikedPosts] = useState<string[]>([])
+
+  // Fetch profile data
   useEffect(() => {
     const loadProfileData = async () => {
       try {
-        const data = await fetchProfileData(username);
-        setProfileData(data);
-        setLoading(false);
+        const data = await fetchProfileData(username)
+        setProfileData(data)
+        setLoading(false)
       } catch (err) {
-        setError("User not found or an error occurred");
-        console.log(err);
-        setLoading(false);
+        setError("User not found or an error occurred")
+        console.log(err)
+        setLoading(false)
       }
-    };
-    loadProfileData();
-  }, [username]);
+    }
+    loadProfileData()
+  }, [username])
 
+  // Simulate saved and liked posts (would come from API in real app)
+  useEffect(() => {
+    // Simulated saved and liked posts
+    const mockSaved = ["1", "3", "5"]
+    const mockLiked = ["2", "4", "6"]
+    setSavedPosts(mockSaved)
+    setLikedPosts(mockLiked)
+  }, [])
+
+  // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
+    setTabValue(newValue)
+  }
+
+  // Toggle save post
+  const handleSavePost = (postId: string) => {
+    setSavedPosts((prev) => (prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]))
+  }
+
+  // Toggle like post
+  const handleLikePost = (postId: string) => {
+    setLikedPosts((prev) => (prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]))
+  }
+
+  // Handle menu open
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchorEl(event.currentTarget)
+  }
+
+  // Handle menu close
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null)
+  }
+
+  // Toggle following
+  const handleFollowToggle = () => {
+    setFollowing(!following)
+  }
+
+  // Get social icon by platform
+  const getSocialIcon = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case "github":
+        return <GitHub />
+      case "linkedin":
+        return <LinkedIn />
+      case "twitter":
+        return <Twitter />
+      default:
+        return <Language />
+    }
+  }
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return formatDistanceToNow(new Date(dateString), { addSuffix: true })
+  }
+
+  // Filter posts based on tab
+  const filteredPosts = useMemo(() => {
+    if (!profileData) return []
+
+    if (tabValue === 0) return profileData.posts
+    if (tabValue === 1) return profileData.posts.filter((post) => post.type === "project")
+    if (tabValue === 2) return profileData.posts.filter((post) => post.type === "event")
+    return profileData.posts
+  }, [profileData, tabValue])
+
+  // Stats data
+  const stats = useMemo(() => {
+    if (!profileData) return { projects: 0, events: 0, total: 0 }
+
+    const projects = profileData.posts.filter((post) => post.type === "project").length
+    const events = profileData.posts.filter((post) => post.type === "event").length
+
+    return {
+      projects,
+      events,
+      total: projects + events,
+    }
+  }, [profileData])
 
   return (
-    <ThemeProvider theme={theme}>
-      <Box
-        sx={{
-          backgroundColor: "background.default",
-          minHeight: "100vh",
-          py: 4,
-          backgroundImage: "linear-gradient(to bottom, #0f172a, #111827)",
-        }}
-      >
-        <Container maxWidth="lg">
-          {loading ? (
-            <LoadingProfileSkeleton />
-          ) : error || !profileData ? (
-            <ErrorDisplay error={error} />
-          ) : (
-            <ProfileContent
-              profileData={profileData}
-              router={router}
-              tabValue={tabValue}
-              handleTabChange={handleTabChange}
-            />
-          )}
-        </Container>
-      </Box>
-    </ThemeProvider>
-  );
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 6 } }}>
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <LoadingProfileSkeleton isMobile={isMobile} />
+        ) : error || !profileData ? (
+          <ErrorDisplay error={error} />
+        ) : (
+          <motion.div variants={containerVariants} initial="hidden" animate="visible">
+            {/* Profile Header Card */}
+            <motion.div variants={itemVariants}>
+              <Paper
+                elevation={0}
+                sx={{
+                  mb: 4,
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  background: "linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.95) 100%)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  position: "relative",
+                }}
+              >
+                {/* Background Pattern */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "100%",
+                    height: "100%",
+                    backgroundImage: "radial-gradient(circle at 90% 10%, rgba(250, 204, 21, 0.1) 0%, transparent 60%)",
+                    opacity: 0.6,
+                    zIndex: 0,
+                  }}
+                />
+
+                <Grid container spacing={0} sx={{ position: "relative", zIndex: 1 }}>
+                  {/* Left column: Avatar and social links */}
+                  <Grid
+                    item
+                    xs={12}
+                    md={4}
+                    sx={{
+                      p: { xs: 3, md: 4 },
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: { xs: "center", md: "center" },
+                      justifyContent: "center",
+                      borderRight: { md: "1px solid rgba(255, 255, 255, 0.1)" },
+                      borderBottom: { xs: "1px solid rgba(255, 255, 255, 0.1)", md: "none" },
+                    }}
+                  >
+                    <Avatar
+                      src={profileData.user.image || ""}
+                      alt={profileData.user.name || profileData.user.username}
+                      sx={{
+                        width: { xs: 100, md: 160 },
+                        height: { xs: 100, md: 160 },
+                        boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                        border: "4px solid rgba(250, 204, 21, 0.6)",
+                        mb: 2,
+                      }}
+                    />
+
+                    <Typography
+                      variant="h5"
+                      sx={{
+                        color: "white",
+                        fontWeight: 700,
+                        textAlign: "center",
+                        mb: 0.5,
+                      }}
+                    >
+                      {profileData.user.name || profileData.user.username}
+                    </Typography>
+
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        color: "#facc15",
+                        fontWeight: 600,
+                        textAlign: "center",
+                        mb: 2,
+                      }}
+                    >
+                      @{profileData.user.username}
+                    </Typography>
+
+                    <Stack direction="row" spacing={2} justifyContent="center" sx={{ mb: 2 }}>
+                      {Object.entries(profileData.user.socialLinks).map(([platform, url]) => (
+                        <Tooltip key={platform} title={platform} arrow>
+                          <IconButton
+                            onClick={() => window.open(url, "_blank")}
+                            sx={{
+                              color: "white",
+                              backgroundColor: "rgba(255, 255, 255, 0.1)",
+                              "&:hover": {
+                                backgroundColor: "#facc15",
+                                color: "#111827",
+                                transform: "translateY(-3px)",
+                              },
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            {getSocialIcon(platform)}
+                          </IconButton>
+                        </Tooltip>
+                      ))}
+                    </Stack>
+
+                    <Box
+                      sx={{
+                        display: { xs: "none", md: "flex" },
+                        justifyContent: "center",
+                        width: "100%",
+                        mt: 1,
+                      }}
+                    >
+                      <Button
+                        variant={following ? "outlined" : "contained"}
+                        startIcon={following ? <PersonAddDisabled /> : <PersonAdd />}
+                        onClick={handleFollowToggle}
+                        sx={{
+                          backgroundColor: following ? "transparent" : "#facc15",
+                          color: following ? "#facc15" : "black",
+                          borderColor: following ? "#facc15" : "transparent",
+                          fontWeight: 600,
+                          borderRadius: "8px",
+                          px: 3,
+                          py: 1,
+                          "&:hover": {
+                            backgroundColor: following ? "rgba(250, 204, 21, 0.1)" : "#e2b714",
+                            borderColor: following ? "#facc15" : "transparent",
+                          },
+                        }}
+                      >
+                        {following ? "Unfollow" : "Follow"}
+                      </Button>
+
+                      <Button
+                        variant="outlined"
+                        startIcon={<Message />}
+                        sx={{
+                          ml: 2,
+                          color: "white",
+                          borderColor: "rgba(255, 255, 255, 0.3)",
+                          "&:hover": {
+                            borderColor: "white",
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                          },
+                          borderRadius: "8px",
+                        }}
+                      >
+                        Message
+                      </Button>
+
+                      <IconButton
+                        onClick={handleMenuOpen}
+                        sx={{
+                          ml: 1,
+                          color: "white",
+                          "&:hover": {
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                          },
+                        }}
+                      >
+                        <MoreVert />
+                      </IconButton>
+
+                      <Menu
+                        anchorEl={menuAnchorEl}
+                        open={Boolean(menuAnchorEl)}
+                        onClose={handleMenuClose}
+                        PaperProps={{
+                          sx: {
+                            mt: 1.5,
+                            backgroundColor: "rgb(31, 41, 55)",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+                          },
+                        }}
+                      >
+                        <MenuItem onClick={handleMenuClose}>
+                          <ListItemIcon sx={{ color: "#facc15" }}>
+                            <BookmarkAdd fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText primaryTypographyProps={{ sx: { color: "white" } }}>Save Profile</ListItemText>
+                        </MenuItem>
+                        <MenuItem onClick={handleMenuClose}>
+                          <ListItemIcon sx={{ color: "#ef4444" }}>
+                            <Flag fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText primaryTypographyProps={{ sx: { color: "white" } }}>Report User</ListItemText>
+                        </MenuItem>
+                      </Menu>
+                    </Box>
+                  </Grid>
+
+                  {/* Right column: Bio, stats */}
+                  <Grid item xs={12} md={8} sx={{ p: { xs: 3, md: 4 } }}>
+                    {/* Mobile action buttons */}
+                    <Box
+                      sx={{
+                        display: { xs: "flex", md: "none" },
+                        justifyContent: "center",
+                        width: "100%",
+                        mb: 3,
+                        gap: 2,
+                      }}
+                    >
+                      <Button
+                        variant={following ? "outlined" : "contained"}
+                        startIcon={following ? <PersonAddDisabled /> : <PersonAdd />}
+                        onClick={handleFollowToggle}
+                        fullWidth
+                        sx={{
+                          backgroundColor: following ? "transparent" : "#facc15",
+                          color: following ? "#facc15" : "black",
+                          borderColor: following ? "#facc15" : "transparent",
+                          fontWeight: 600,
+                          borderRadius: "8px",
+                          "&:hover": {
+                            backgroundColor: following ? "rgba(250, 204, 21, 0.1)" : "#e2b714",
+                            borderColor: following ? "#facc15" : "transparent",
+                          },
+                        }}
+                      >
+                        {following ? "Unfollow" : "Follow"}
+                      </Button>
+
+                      <Button
+                        variant="outlined"
+                        startIcon={<Message />}
+                        fullWidth
+                        sx={{
+                          color: "white",
+                          borderColor: "rgba(255, 255, 255, 0.3)",
+                          "&:hover": {
+                            borderColor: "white",
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                          },
+                          borderRadius: "8px",
+                        }}
+                      >
+                        Message
+                      </Button>
+                    </Box>
+
+                    {/* Bio */}
+                    {profileData.user.bio && (
+                      <Box sx={{ mb: 3 }}>
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            color: "white",
+                            lineHeight: 1.6,
+                            fontSize: "1rem",
+                          }}
+                        >
+                          {profileData.user.bio}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {/* Stats */}
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                      <Grid item xs={4}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            textAlign: "center",
+                            backgroundColor: "rgba(255, 255, 255, 0.05)",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                          }}
+                        >
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              fontWeight: 700,
+                              color: "#facc15",
+                              mb: 0.5,
+                            }}
+                          >
+                            {stats.total}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "rgba(255, 255, 255, 0.7)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Posts
+                          </Typography>
+                        </Paper>
+                      </Grid>
+
+                      <Grid item xs={4}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            textAlign: "center",
+                            backgroundColor: "rgba(255, 255, 255, 0.05)",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                          }}
+                        >
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              fontWeight: 700,
+                              color: "#facc15",
+                              mb: 0.5,
+                            }}
+                          >
+                            {stats.projects}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "rgba(255, 255, 255, 0.7)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Projects
+                          </Typography>
+                        </Paper>
+                      </Grid>
+
+                      <Grid item xs={4}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            textAlign: "center",
+                            backgroundColor: "rgba(255, 255, 255, 0.05)",
+                            borderRadius: "12px",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                          }}
+                        >
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              fontWeight: 700,
+                              color: "#facc15",
+                              mb: 0.5,
+                            }}
+                          >
+                            {stats.events}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "rgba(255, 255, 255, 0.7)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Events
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+
+                    {/* About / Join Date */}
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          color: "rgba(255, 255, 255, 0.7)",
+                          mb: 1,
+                        }}
+                      >
+                        <CalendarToday fontSize="small" sx={{ mr: 1, color: "#facc15", fontSize: "1rem" }} />
+                        Joined{" "}
+                        {new Date(profileData.user.createdAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </motion.div>
+
+            {/* Content Tabs */}
+            <motion.div variants={itemVariants}>
+              <Paper
+                elevation={0}
+                sx={{
+                  borderRadius: "16px",
+                  backgroundColor: "rgba(31, 41, 55, 0.85)",
+                  backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  mb: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <Tabs
+                  value={tabValue}
+                  onChange={handleTabChange}
+                  variant={isMobile ? "scrollable" : "fullWidth"}
+                  scrollButtons={isMobile ? "auto" : undefined}
+                  sx={{
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                    ".MuiTabs-indicator": {
+                      backgroundColor: "#facc15",
+                    },
+                  }}
+                >
+                  <Tab
+                    label={`All Posts (${profileData.posts.length})`}
+                    sx={{
+                      color: "white",
+                      fontWeight: tabValue === 0 ? 600 : 400,
+                      opacity: tabValue === 0 ? 1 : 0.7,
+                      textTransform: "none",
+                      fontSize: "0.95rem",
+                    }}
+                  />
+                  <Tab
+                    label={`Projects (${stats.projects})`}
+                    sx={{
+                      color: "white",
+                      fontWeight: tabValue === 1 ? 600 : 400,
+                      opacity: tabValue === 1 ? 1 : 0.7,
+                      textTransform: "none",
+                      fontSize: "0.95rem",
+                    }}
+                  />
+                  <Tab
+                    label={`Events (${stats.events})`}
+                    sx={{
+                      color: "white",
+                      fontWeight: tabValue === 2 ? 600 : 400,
+                      opacity: tabValue === 2 ? 1 : 0.7,
+                      textTransform: "none",
+                      fontSize: "0.95rem",
+                    }}
+                  />
+                </Tabs>
+              </Paper>
+            </motion.div>
+
+            {/* Posts Grid */}
+            {filteredPosts.length === 0 ? (
+              <motion.div variants={itemVariants}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(31, 41, 55, 0.85)",
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ color: "white", mb: 2 }}>
+                    No posts found
+                  </Typography>
+                  <Typography sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>
+                    {profileData.user.username} hasn&apos;t posted any{" "}
+                    {tabValue === 1 ? "projects" : tabValue === 2 ? "events" : "content"} yet.
+                  </Typography>
+                </Paper>
+              </motion.div>
+            ) : (
+              <Grid container spacing={3}>
+                {filteredPosts.map((post) => (
+                  <Grid item xs={12} md={6} lg={4} key={post.id}>
+                    <motion.div variants={cardVariants} whileHover="hover" layout>
+                      <Card
+                        elevation={0}
+                        sx={{
+                          height: "100%",
+                          borderRadius: "16px",
+                          backgroundColor: "rgba(31, 41, 55, 0.85)",
+                          backdropFilter: "blur(16px)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          transition: "all 0.3s ease",
+                          overflow: "hidden",
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        {/* Card Media */}
+                        {post.images && post.images.length > 0 ? (
+                          <CardMedia
+                            component="img"
+                            height={180}
+                            image={post.images[0]}
+                            alt={post.title}
+                            sx={{
+                              objectFit: "cover",
+                              transition: "transform 0.5s ease",
+                              "&:hover": {
+                                transform: "scale(1.05)",
+                              },
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              height: 140,
+                              background:
+                                post.type === "project"
+                                  ? "linear-gradient(135deg, rgba(250, 204, 21, 0.3) 0%, rgba(245, 158, 11, 0.3) 100%)"
+                                  : "linear-gradient(135deg, rgba(250, 204, 21, 0.3) 0%, rgba(251, 191, 36, 0.3) 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: "#facc15" }}>
+                              {post.type === "project" ? "Project" : "Event"}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {/* Card Content */}
+                        <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                          <Box sx={{ mb: 2 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                mb: 1,
+                              }}
+                            >
+                              <Typography
+                                variant="h6"
+                                component="h2"
+                                sx={{
+                                  fontWeight: 700,
+                                  color: "white",
+                                  lineHeight: 1.3,
+                                }}
+                              >
+                                {post.title}
+                              </Typography>
+                              <Chip
+                                label={post.type}
+                                size="small"
+                                sx={{
+                                  ml: 1,
+                                  backgroundColor: "#facc15",
+                                  color: "#111827",
+                                  fontWeight: 600,
+                                  textTransform: "capitalize",
+                                }}
+                              />
+                            </Box>
+
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: "rgba(255,255,255,0.8)",
+                                mb: 2,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              {post.description}
+                            </Typography>
+                          </Box>
+
+                          {/* Tags (for projects) */}
+                          {post.type === "project" && post.tags && post.tags.length > 0 && (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 0.5,
+                                mb: 1,
+                              }}
+                            >
+                              {post.tags.slice(0, 3).map((tag) => (
+                                <Chip
+                                  key={tag}
+                                  label={tag}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                                    color: "rgba(255, 255, 255, 0.9)",
+                                    borderRadius: "4px",
+                                    height: "22px",
+                                    fontSize: "0.7rem",
+                                  }}
+                                />
+                              ))}
+                              {post.tags.length > 3 && (
+                                <Chip
+                                  label={`+${post.tags.length - 3}`}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: "rgba(250, 204, 21, 0.2)",
+                                    color: "#facc15",
+                                    borderRadius: "4px",
+                                    height: "22px",
+                                    fontSize: "0.7rem",
+                                  }}
+                                />
+                              )}
+                            </Box>
+                          )}
+
+                          {/* Event details */}
+                          {post.type === "event" && post.date && (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  color: "rgba(255,255,255,0.7)",
+                                }}
+                              >
+                                <CalendarToday
+                                  fontSize="small"
+                                  sx={{
+                                    color: "#facc15",
+                                    mr: 1,
+                                    fontSize: "0.85rem",
+                                  }}
+                                />
+                                <Typography variant="body2">
+                                  {new Date(post.date).toLocaleDateString(undefined, {
+                                    weekday: "short",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </Typography>
+                              </Box>
+
+                              {post.location && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    color: "rgba(255,255,255,0.7)",
+                                  }}
+                                >
+                                  <LocationOn
+                                    fontSize="small"
+                                    sx={{
+                                      color: "#facc15",
+                                      mr: 1,
+                                      fontSize: "0.85rem",
+                                    }}
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 1,
+                                      WebkitBoxOrient: "vertical",
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    {post.location}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          )}
+                        </CardContent>
+
+                        <Divider sx={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }} />
+
+                        {/* Card Actions */}
+                        <CardActions
+                          sx={{
+                            justifyContent: "space-between",
+                            px: 2,
+                            py: 1.5,
+                          }}
+                        >
+                          <Box sx={{ display: "flex", gap: 1 }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleLikePost(post.id)}
+                              sx={{
+                                color: likedPosts.includes(post.id) ? "#facc15" : "rgba(255,255,255,0.7)",
+                              }}
+                            >
+                              {likedPosts.includes(post.id) ? (
+                                <Favorite fontSize="small" />
+                              ) : (
+                                <FavoriteBorder fontSize="small" />
+                              )}
+                            </IconButton>
+                            <IconButton size="small" sx={{ color: "rgba(255,255,255,0.7)" }}>
+                              <Comment fontSize="small" />
+                              <Typography variant="caption" sx={{ ml: 0.5, fontSize: "0.7rem" }}>
+                                {post.commentCount}
+                              </Typography>
+                            </IconButton>
+                          </Box>
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleSavePost(post.id)}
+                              sx={{
+                                color: savedPosts.includes(post.id) ? "#facc15" : "rgba(255,255,255,0.7)",
+                                mr: 1,
+                              }}
+                            >
+                              {savedPosts.includes(post.id) ? (
+                                <Bookmark fontSize="small" />
+                              ) : (
+                                <BookmarkAdd fontSize="small" />
+                              )}
+                            </IconButton>
+                            <Link href={`/${post.type}s/${post.id}`} style={{ textDecoration: "none" }}>
+                              <Button
+                                size="small"
+                                variant="text"
+                                sx={{
+                                  color: "#facc15",
+                                  fontWeight: 600,
+                                  "&:hover": {
+                                    backgroundColor: "rgba(250, 204, 21, 0.1)",
+                                  },
+                                }}
+                              >
+                                View
+                              </Button>
+                            </Link>
+                          </Box>
+                        </CardActions>
+                      </Card>
+                    </motion.div>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Container>
+  )
 }
 
 // Loading skeleton component
-function LoadingProfileSkeleton() {
+function LoadingProfileSkeleton({ isMobile }: { isMobile: boolean }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Paper elevation={1} sx={{ p: 4, mb: 4 }}>
-        <Grid container spacing={4}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 4,
+          borderRadius: "16px",
+          backgroundColor: "rgba(31, 41, 55, 0.85)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          overflow: "hidden",
+        }}
+      >
+        <Grid container spacing={0}>
           <Grid
             item
             xs={12}
-            md={3}
-            sx={{ display: "flex", justifyContent: "center" }}
+            md={4}
+            sx={{
+              p: { xs: 3, md: 4 },
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              borderRight: { md: "1px solid rgba(255, 255, 255, 0.1)" },
+              borderBottom: { xs: "1px solid rgba(255, 255, 255, 0.1)", md: "none" },
+            }}
           >
             <Skeleton
               variant="circular"
-              width={150}
-              height={150}
+              width={isMobile ? 100 : 160}
+              height={isMobile ? 100 : 160}
               sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
             />
+            <Skeleton variant="text" width={120} height={30} sx={{ mt: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
+            <Skeleton variant="text" width={80} height={24} sx={{ mb: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
+            <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton
+                  key={i}
+                  variant="circular"
+                  width={36}
+                  height={36}
+                  sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
+                />
+              ))}
+            </Box>
+            <Box sx={{ display: "flex", width: "100%", gap: 2 }}>
+              <Skeleton
+                variant="rectangular"
+                width="60%"
+                height={36}
+                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
+              />
+              <Skeleton
+                variant="rectangular"
+                width="40%"
+                height={36}
+                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
+              />
+            </Box>
           </Grid>
-          <Grid item xs={12} md={9}>
-            <Skeleton
-              variant="text"
-              width="60%"
-              height={60}
-              sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
-            />
-            <Skeleton
-              variant="text"
-              width="40%"
-              height={30}
-              sx={{ mb: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }}
-            />
-            <Skeleton
-              variant="text"
-              width="80%"
-              height={60}
-              sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
-            />
-            <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-              <Skeleton
-                variant="rectangular"
-                width={100}
-                height={36}
-                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
-              />
-              <Skeleton
-                variant="rectangular"
-                width={100}
-                height={36}
-                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
-              />
-              <Skeleton
-                variant="rectangular"
-                width={100}
-                height={36}
-                sx={{ borderRadius: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }}
-              />
-            </Stack>
+          <Grid item xs={12} md={8} sx={{ p: { xs: 3, md: 4 } }}>
+            <Skeleton variant="text" width="90%" height={20} sx={{ mb: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
+            <Skeleton variant="text" width="95%" height={20} sx={{ mb: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
+            <Skeleton variant="text" width="80%" height={20} sx={{ mb: 3, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
+
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[1, 2, 3].map((i) => (
+                <Grid item xs={4} key={i}>
+                  <Skeleton
+                    variant="rectangular"
+                    width="100%"
+                    height={80}
+                    sx={{ borderRadius: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+
+            <Skeleton variant="text" width={200} height={24} sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }} />
           </Grid>
         </Grid>
       </Paper>
 
-      <Paper elevation={1} sx={{ p: 4 }}>
-        <Skeleton
-          variant="text"
-          width="40%"
-          height={40}
-          sx={{ mx: "auto", mb: 3, bgcolor: "rgba(255, 255, 255, 0.1)" }}
-        />
-        <Stack spacing={3}>
-          {[1, 2, 3].map((item) => (
+      <Skeleton
+        variant="rectangular"
+        width="100%"
+        height={50}
+        sx={{ borderRadius: 2, mb: 4, bgcolor: "rgba(255, 255, 255, 0.1)" }}
+      />
+
+      <Grid container spacing={3}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Grid item xs={12} md={6} lg={4} key={i}>
             <Skeleton
-              key={item}
               variant="rectangular"
               width="100%"
-              height={200}
+              height={350}
               sx={{ borderRadius: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }}
             />
-          ))}
-        </Stack>
-      </Paper>
+          </Grid>
+        ))}
+      </Grid>
     </motion.div>
-  );
+  )
 }
 
 // Error display component
@@ -375,534 +1132,47 @@ function ErrorDisplay({ error }: { error: string | null }) {
   return (
     <Box
       sx={{
-        minHeight: "50vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        minHeight: "50vh",
       }}
     >
       <Paper
-        elevation={3}
+        elevation={0}
         sx={{
           p: 4,
-          textAlign: "center",
           maxWidth: 500,
-          borderTop: "4px solid",
-          borderColor: "error.main",
+          borderRadius: "16px",
+          backgroundColor: "rgba(31, 41, 55, 0.85)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          textAlign: "center",
         }}
       >
-        <Typography variant="h5" color="error" gutterBottom>
-          Oops! Something went wrong
+        <Typography variant="h5" sx={{ color: "#ef4444", mb: 2 }}>
+          Profile Not Found
         </Typography>
-        <Typography color="text.secondary">
-          {error ||
-            "Profile not found. The user may not exist or has been removed."}
+        <Typography sx={{ color: "rgba(255,255,255,0.8)", mb: 3 }}>
+          {error || "The user profile you're looking for doesn't exist or has been removed."}
         </Typography>
         <Button
           variant="contained"
-          color="primary"
-          sx={{ mt: 3 }}
-          onClick={() => (window.location.href = "/")}
-        >
-          Go to Homepage
-        </Button>
-      </Paper>
-    </Box>
-  );
-}
-
-// Main profile content component
-function ProfileContent({
-  profileData,
-  router,
-  tabValue,
-  handleTabChange,
-}: {
-  profileData: ProfileData;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  router: any;
-  tabValue: number;
-  handleTabChange: (event: React.SyntheticEvent, newValue: number) => void;
-}) {
-  const { user, posts } = profileData;
-  const projectPosts = posts.filter((post) => post.type === "project");
-  const eventPosts = posts.filter((post) => post.type === "event");
-
-  return (
-    <motion.div variants={containerVariants} initial="hidden" animate="visible">
-      {/* Profile Header */}
-      <Paper
-        elevation={1}
-        sx={{
-          mb: 4,
-          p: 4,
-          borderRadius: 3,
-          background:
-            "linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.95) 100%)",
-          position: "relative",
-          overflow: "hidden",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-        }}
-      >
-        <Box
+          component={Link}
+          href="/dashboard"
           sx={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            width: "30%",
-            height: "100%",
-            background:
-              "linear-gradient(135deg, rgba(250, 204, 21, 0.05) 0%, rgba(250, 204, 21, 0.1) 100%)",
-            clipPath: "polygon(100% 0, 0 0, 100% 100%)",
-            zIndex: 0,
-          }}
-        />
-
-        <Grid container spacing={4} sx={{ position: "relative", zIndex: 1 }}>
-          <Grid
-            item
-            xs={12}
-            md={3}
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: { xs: "center", md: "flex-start" },
-            }}
-          >
-            <Avatar
-              alt={user.name || user.username}
-              src={user.image || ""}
-              sx={{
-                width: 150,
-                height: 150,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-                border: "4px solid rgba(250, 204, 21, 0.5)",
-              }}
-            />
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mt: 2, display: "flex", alignItems: "center", gap: 0.5 }}
-            >
-              <CalendarMonth fontSize="small" />
-              Member since{" "}
-              {user.createdAt
-                ? new Date(user.createdAt).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : "N/A"}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={9}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                flexWrap: "wrap",
-              }}
-            >
-              <Box>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    fontWeight: 700,
-                    color: "#ffffff",
-                    textShadow: "0 2px 4px rgba(0,0,0,0.3)",
-                  }}
-                >
-                  {user.name || user.username || "Anonymous"}
-                </Typography>
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    display: "inline-block",
-                    background:
-                      "linear-gradient(90deg, #facc15 0%, #fde68a 100%)",
-                    padding: "2px 8px",
-                    borderRadius: "4px",
-                    color: "#111827",
-                    fontWeight: 600,
-                    mb: 2,
-                  }}
-                >
-                  @{user.username}
-                </Typography>
-              </Box>
-
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<Favorite />}
-                sx={{
-                  borderRadius: "20px",
-                  px: 3,
-                  boxShadow: "0 4px 12px rgba(250, 204, 21, 0.3)",
-                  color: "#111827",
-                  fontWeight: 600,
-                }}
-              >
-                Follow
-              </Button>
-            </Box>
-
-            {user.bio && (
-              <Typography
-                variant="body1"
-                sx={{
-                  color: "#e2e8f0",
-                  mt: 1,
-                  mb: 3,
-                  lineHeight: 1.6,
-                  fontSize: "1.05rem",
-                }}
-              >
-                {user.bio}
-              </Typography>
-            )}
-
-            <Divider sx={{ my: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
-
-            <Typography variant="subtitle2" color="#d1d5db" gutterBottom>
-              Connect with {user.name || user.username}
-            </Typography>
-
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mt: 1, flexWrap: "wrap", gap: 1 }}
-            >
-              {Object.entries(user.socialLinks).map(([platform, url]) => (
-                <Button
-                  key={platform}
-                  variant="outlined"
-                  color="primary"
-                  size="small"
-                  startIcon={getSocialIcon(platform)}
-                  onClick={() => window.open(url, "_blank")}
-                  sx={{
-                    borderRadius: "20px",
-                    textTransform: "capitalize",
-                    "&:hover": {
-                      backgroundColor: "rgba(250, 204, 21, 0.1)",
-                    },
-                  }}
-                >
-                  {platform}
-                </Button>
-              ))}
-            </Stack>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Posts Section */}
-      <Paper
-        elevation={1}
-        sx={{
-          borderRadius: 3,
-          overflow: "hidden",
-          background: "rgba(17, 24, 39, 0.95)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-        }}
-      >
-        <Box sx={{ borderBottom: 1, borderColor: "rgba(255, 255, 255, 0.1)" }}>
-          <Tabs
-            value={tabValue}
-            onChange={handleTabChange}
-            variant="fullWidth"
-            textColor="primary"
-            indicatorColor="primary"
-            aria-label="profile content tabs"
-            sx={{
-              "& .MuiTabs-indicator": {
-                backgroundColor: "#facc15",
-              },
-            }}
-          >
-            <Tab label="All Posts" />
-            <Tab label="Projects" />
-            <Tab label="Events" />
-          </Tabs>
-        </Box>
-
-        <Box sx={{ p: 3 }}>
-          {tabValue === 0 && <PostsTabContent posts={posts} user={user} />}
-          {tabValue === 1 && (
-            <PostsTabContent posts={projectPosts} user={user} />
-          )}
-          {tabValue === 2 && <PostsTabContent posts={eventPosts} user={user} />}
-        </Box>
-      </Paper>
-    </motion.div>
-  );
-}
-
-// Posts tab content component
-function PostsTabContent({
-  posts,
-  user,
-}: {
-  posts: ExtendedPost[];
-  user: ProfileUser;
-}) {
-  if (posts.length === 0) {
-    return (
-      <Box sx={{ py: 4, textAlign: "center" }}>
-        <Typography color="#d1d5db" sx={{ mb: 2 }}>
-          No posts to display in this category.
-        </Typography>
-        <Button
-          variant="outlined"
-          color="primary"
-          sx={{
-            borderColor: "rgba(250, 204, 21, 0.5)",
+            backgroundColor: "#facc15",
+            color: "black",
+            fontWeight: 600,
             "&:hover": {
-              borderColor: "#facc15",
-              backgroundColor: "rgba(250, 204, 21, 0.1)",
+              backgroundColor: "#e2b714",
             },
           }}
         >
-          Create New Post
+          Back to Dashboard
         </Button>
-      </Box>
-    );
-  }
-
-  return (
-    <Grid container spacing={3}>
-      {posts.map((post) => (
-        <Grid item xs={12} md={6} lg={4} key={post.id}>
-          <motion.div
-            variants={itemVariants}
-            whileHover={{
-              y: -5,
-              transition: { duration: 0.2 },
-            }}
-          >
-            <Card
-              sx={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                transition: "all 0.3s ease",
-                backgroundColor: "rgba(17, 24, 39, 0.9)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                "&:hover": {
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-                  borderColor: "rgba(250, 204, 21, 0.3)",
-                },
-              }}
-            >
-              {post.images && post.images.length > 0 ? (
-                <CardMedia
-                  component="img"
-                  height="180"
-                  image={post.images[0]}
-                  alt={post.title}
-                />
-              ) : (
-                <Box
-                  sx={{
-                    height: 140,
-                    background:
-                      post.type === "project"
-                        ? "linear-gradient(135deg, rgba(250, 204, 21, 0.7) 0%, rgba(245, 158, 11, 0.7) 100%)"
-                        : "linear-gradient(135deg, rgba(250, 204, 21, 0.7) 0%, rgba(251, 191, 36, 0.7) 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#111827",
-                  }}
-                >
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 700, color: "#111827" }}
-                  >
-                    {post.type === "project" ? "Project" : "Event"}
-                  </Typography>
-                </Box>
-              )}
-
-              <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    mb: 1,
-                  }}
-                >
-                  <Typography
-                    variant="h6"
-                    component="div"
-                    sx={{
-                      fontWeight: 600,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                      lineHeight: 1.3,
-                      color: "#ffffff",
-                    }}
-                  >
-                    {post.title}
-                  </Typography>
-                  <Chip
-                    label={post.type}
-                    size="small"
-                    color="primary"
-                    sx={{
-                      ml: 1,
-                      textTransform: "capitalize",
-                      color: "#111827",
-                      fontWeight: 600,
-                      backgroundColor:
-                        post.type === "project" ? "#facc15" : "#fbbf24",
-                    }}
-                  />
-                </Box>
-
-                <Typography
-                  variant="body2"
-                  sx={{
-                    mb: 2,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                    height: "4.5em",
-                    color: "#d1d5db",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {post.description}
-                </Typography>
-
-                {post.type === "project" &&
-                  post.tags &&
-                  post.tags.length > 0 && (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 0.5,
-                        mb: 1,
-                      }}
-                    >
-                      {post.tags.slice(0, 3).map((tag) => (
-                        <Chip
-                          key={tag}
-                          label={tag}
-                          size="small"
-                          variant="outlined"
-                          color="primary"
-                          sx={{
-                            fontSize: "0.7rem",
-                            color: "#facc15",
-                            borderColor: "rgba(250, 204, 21, 0.5)",
-                          }}
-                        />
-                      ))}
-                      {post.tags.length > 3 && (
-                        <Chip
-                          label={`+${post.tags.length - 3}`}
-                          size="small"
-                          color="primary"
-                          sx={{
-                            fontSize: "0.7rem",
-                            color: "#111827",
-                            backgroundColor: "#facc15",
-                          }}
-                        />
-                      )}
-                    </Box>
-                  )}
-
-                {post.type === "event" && post.date && (
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                    <CalendarMonth
-                      fontSize="small"
-                      sx={{ mr: 0.5, color: "#facc15" }}
-                    />
-                    <Typography variant="body2" sx={{ color: "#d1d5db" }}>
-                      {new Date(post.date).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </Typography>
-
-                    {post.location && (
-                      <>
-                        <Box
-                          component="span"
-                          sx={{ mx: 0.5, color: "#d1d5db" }}
-                        >
-                          •
-                        </Box>
-                        <LocationOn
-                          fontSize="small"
-                          sx={{ mr: 0.5, color: "#facc15" }}
-                        />
-                        <Typography
-                          variant="body2"
-                          noWrap
-                          sx={{ maxWidth: "120px", color: "#d1d5db" }}
-                        >
-                          {post.location}
-                        </Typography>
-                      </>
-                    )}
-                  </Box>
-                )}
-              </CardContent>
-
-              <Divider sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }} />
-
-              <CardActions
-                sx={{ justifyContent: "space-between", px: 3, py: 1.5 }}
-              >
-                <Typography variant="caption" sx={{ color: "#9ca3af" }}>
-                  {formatDate(post.createdAt)}
-                </Typography>
-
-                <Box>
-                  <IconButton
-                    size="small"
-                    aria-label="comments"
-                    sx={{ color: "#d1d5db" }}
-                  >
-                    <Comment fontSize="small" />
-                    <Typography variant="caption" sx={{ ml: 0.5 }}>
-                      {post.commentCount}
-                    </Typography>
-                  </IconButton>
-
-                  <Link href={`/${post.type}s/${post.id}`} passHref>
-                    <Button
-                      size="small"
-                      color="primary"
-                      sx={{
-                        ml: 1,
-                        color: "#facc15",
-                        "&:hover": {
-                          backgroundColor: "rgba(250, 204, 21, 0.1)",
-                        },
-                      }}
-                    >
-                      View
-                    </Button>
-                  </Link>
-                </Box>
-              </CardActions>
-            </Card>
-          </motion.div>
-        </Grid>
-      ))}
-    </Grid>
-  );
+      </Paper>
+    </Box>
+  )
 }
+
