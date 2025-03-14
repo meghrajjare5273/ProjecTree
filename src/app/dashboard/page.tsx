@@ -286,9 +286,11 @@ export default function Dashboard() {
                 Welcome back, {user?.name || "User"}
               </p>
             </div>
-            <button className="bg-[#ffcc00] hover:bg-[#e6b800] text-black font-medium px-4 py-2 rounded-md">
-              Create Post
-            </button>
+            <Link href={"/create-post"}>
+              <button className="bg-[#ffcc00] hover:bg-[#e6b800] text-black font-medium px-4 py-2 rounded-md">
+                Create Post
+              </button>
+            </Link>
           </div>
         </header>
 
