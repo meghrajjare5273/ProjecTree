@@ -18,8 +18,6 @@ import {
   Globe,
   Twitter,
   Mail,
-  Home,
-  Bell,
 } from "lucide-react";
 
 // Types
@@ -179,37 +177,6 @@ export default function UserProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#121212]">
-      {/* Header with navigation */}
-      <header className="bg-[#1a1a1a] border-b border-[#333333] py-4 px-6">
-        <div className="flex justify-between items-center">
-          <Link href="/" className="text-white text-2xl font-bold">
-            ProjecTree
-          </Link>
-          <div className="flex items-center space-x-4">
-            <Link href="/dashboard" className="text-white">
-              <Home className="w-5 h-5" />
-            </Link>
-            <Link href="/notifications" className="text-white relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 bg-[#ffcc00] text-black text-xs font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                3
-              </span>
-            </Link>
-            <button className="bg-[#ffcc00] hover:bg-[#e6b800] text-black font-medium px-4 py-2 rounded-md">
-              Create
-            </button>
-            <div className="relative w-8 h-8 rounded-full overflow-hidden">
-              <Image
-                src="/placeholder.svg?height=32&width=32"
-                alt="User"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
       {loading ? (
         <LoadingProfileSkeleton />
       ) : error || !profileData ? (
@@ -225,10 +192,10 @@ export default function UserProfilePage() {
 
             {/* Profile Info */}
             <div className="max-w-5xl mx-auto px-4 relative -mt-16">
-              <div className="bg-[#1a1a1a] rounded-lg border border-[#333333] overflow-hidden">
+              <div className="bg-[#1a1a1a] rounded-lg border border-[#333333] overflow-visible">
                 <div className="p-6 pt-0">
                   {/* Avatar */}
-                  <div className="relative w-32 h-32 -mt-16 mb-4 border-4 border-[#1a1a1a] rounded-full overflow-hidden">
+                  <div className="avatar w-32 h-32 -mt-16 mb-4 border-4 border-[#1a1a1a] rounded-full overflow-hidden">
                     <Image
                       src={
                         profileData.user.image ||
@@ -236,7 +203,7 @@ export default function UserProfilePage() {
                       }
                       alt={profileData.user.name || profileData.user.username}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                     />
                   </div>
 

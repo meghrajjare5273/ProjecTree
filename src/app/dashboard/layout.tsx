@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard | ProjecTree",
+  title: "Dashboard",
   description: "Manage your projects, events, and profile on ProjecTree",
 };
 
