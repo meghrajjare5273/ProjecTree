@@ -69,6 +69,7 @@ export type Event = {
   date: Date;
   location: string | undefined;
   images: string[];
+  tags: [];
   organizer?: string;
   userId: string;
   user: User;
