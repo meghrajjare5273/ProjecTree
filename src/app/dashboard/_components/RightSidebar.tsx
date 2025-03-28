@@ -10,24 +10,43 @@ import type User from "@/types/users";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import useSWR from "swr";
+import { useEffect, useState } from "react";
 
 interface RightSidebarProps {
   user: User | null;
   trendingTopics: string[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const fetcher = (url: string) =>
+  fetch(url, { credentials: "include" }).then((res) => res.json());
+
 export default function RightSidebar({
   user,
   trendingTopics,
 }: RightSidebarProps) {
-  const fetcher = (url: string) =>
-    fetch(url, { credentials: "include" }).then((res) => res.json());
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: suggestedUsers, error: suggestedUsersError } = useSWR(
-    "/api/suggested-users",
-    fetcher
-  );
+  useEffect(() => {
+    const fetchSuggestedUsers = async () => {
+      try {
+        const res = await fetch("/api/suggested-users", {
+          credentials: "include",
+        });
+        const data = await res.json();
+        setSuggestedUsers(data.users);
+        setIsLoading(false);
+      } catch (err: any) {
+        setError(err.message || "Failed to load suggested users");
+        setIsLoading(false);
+      }
+    };
+
+    fetchSuggestedUsers();
+    // console.log(suggestedUsers);
+  }, []);
 
   return (
     <div className="w-full md:w-80 order-1 md:order-2">
@@ -113,13 +132,11 @@ export default function RightSidebar({
         <CardContent className="p-4">
           <h3 className="text-white font-medium mb-4">Suggested Users</h3>
           <div className="space-y-3">
-            {suggestedUsersError ? (
-              <p className="text-red-500">Failed to load suggested users</p>
-            ) : !suggestedUsers ? (
+            {isLoading ? (
               <p className="text-gray-500">Loading suggested users...</p>
-            ) : suggestedUsers.length === 0 ? (
-              <p className="text-gray-500">No suggested users found</p>
-            ) : (
+            ) : error ? (
+              <p className="text-red-500">Failed to load suggested users</p>
+            ) : suggestedUsers && suggestedUsers.length > 0 ? (
               suggestedUsers.map((user: any, index: number) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -132,9 +149,12 @@ export default function RightSidebar({
                       />
                     </Avatar>
                     <div className="ml-3">
-                      <p className="text-white text-sm font-medium">
+                      <Link
+                        href={`/users/${user.username}`}
+                        className="text-white text-sm font-medium"
+                      >
                         {user.name}
-                      </p>
+                      </Link>
                       <p className="text-gray-500 text-xs">{user.username}</p>
                     </div>
                   </div>
@@ -147,6 +167,8 @@ export default function RightSidebar({
                   </Button>
                 </div>
               ))
+            ) : (
+              <p className="text-gray-500">No suggested users found</p>
             )}
           </div>
         </CardContent>

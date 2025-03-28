@@ -1,4 +1,5 @@
 "use client";
+
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -24,7 +25,7 @@ import {
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import useSWR from "swr";
+import { useEffect, useState } from "react";
 
 interface LeftSidebarProps {
   user: User | null;
@@ -32,27 +33,41 @@ interface LeftSidebarProps {
   closeMobileSidebar: () => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const fetcher = (url: string) =>
+  fetch(url, { credentials: "include" }).then((res) => res.json());
+
 export default function LeftSidebar({
   user,
   mobileSidebarOpen,
   closeMobileSidebar,
 }: LeftSidebarProps) {
-  const fetcher = (url: string) =>
-    fetch(url, { credentials: "include" }).then((res) => res.json());
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { data: userStats, error: userStatsError } = useSWR(
-    "/api/user-stats",
-    fetcher
-  );
   const router = useRouter();
+  const [userStats, setUserStats] = useState({
+    posts: 0,
+    followers: 0,
+    following: 0,
+  });
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      try {
+        const res = await fetch("/api/user-stats", { credentials: "include" });
+        const data = await res.json();
+        setUserStats(data);
+      } catch (error) {
+        console.error("Failed to fetch user stats:", error);
+      }
+    };
+    fetchUserStats();
+  }, []);
 
   // Handle sign out
   const handleSignOut = async () => {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          router.push("/");
+          router.push("/auth?mode=signin");
         },
       },
     });
@@ -90,18 +105,18 @@ export default function LeftSidebar({
 
             <div className="flex gap-4 mt-3">
               <div className="text-center">
-                <p className="text-[#ffcc00] font-bold">{userStats.posts}</p>
+                <p className="text-[#ffcc00] font-bold">{userStats?.posts}</p>
                 <p className="text-xs text-gray-400">Posts</p>
               </div>
               <div className="text-center">
                 <p className="text-[#ffcc00] font-bold">
-                  {userStats.following}
+                  {userStats?.following}
                 </p>
                 <p className="text-xs text-gray-400">Following</p>
               </div>
               <div className="text-center">
                 <p className="text-[#ffcc00] font-bold">
-                  {userStats.followers}
+                  {userStats?.followers}
                 </p>
                 <p className="text-xs text-gray-400">Followers</p>
               </div>
@@ -122,7 +137,7 @@ export default function LeftSidebar({
             </div>
           </>
         )}
-          </div>
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-6 px-4">

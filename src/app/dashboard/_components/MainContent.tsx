@@ -220,7 +220,7 @@ export default function MainContent({
                         @{post.user.username}
                       </p>
                       <p className="text-gray-400 text-xs">
-                        {formatDate(post.createdAt)}
+                        {formatDate(new Date(post.createdAt))}
                       </p>
                     </div>
                   </Link>

@@ -18,8 +18,8 @@ export async function GET() {
     const suggestedUsers = await prisma.user.findMany({
       where: {
         id: { not: session.user.id },
-        username: { not: null }, // Only users who have completed their profile
-        image: { not: null }, // Only users with profile images
+        // username: { not: null }, // Only users who have completed their profile
+        // image: { not: null }, // Only users with profile images
       },
       select: {
         id: true,
@@ -32,7 +32,7 @@ export async function GET() {
         createdAt: "desc", // Get newest users first
       },
     });
-    
+
     return NextResponse.json({ users: suggestedUsers });
   } catch (error) {
     console.error("Error fetching suggested users:", error);

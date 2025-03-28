@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Bell, MessageSquare } from "lucide-react";
 import type User from "@/types/users";
@@ -19,6 +20,14 @@ export default function Navbar({
   searchQuery,
   setSearchQuery,
 }: NavbarProps) {
+  // Use useState to manage the user data on the client-side
+  const [clientUser, setClientUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Set the user data on the client-side after the component has mounted
+    setClientUser(user);
+  }, [user]);
+
   return (
     <header className="bg-[#1a1a1a]/80 backdrop-blur-md border-b border-[#333333] py-4 px-6 sticky top-0 z-30">
       <div className="max-w-5xl mx-auto flex justify-between items-center">
@@ -27,7 +36,7 @@ export default function Navbar({
             Dashboard
           </h1>
           <p className="text-gray-400 text-sm">
-            Welcome back, {user?.name || "User"}
+            Welcome back, {clientUser?.name || "User"}
           </p>
         </div>
 
