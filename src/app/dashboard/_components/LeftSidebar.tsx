@@ -24,6 +24,7 @@ import {
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import useSWR from "swr";
 
 interface LeftSidebarProps {
   user: User | null;
@@ -36,6 +37,14 @@ export default function LeftSidebar({
   mobileSidebarOpen,
   closeMobileSidebar,
 }: LeftSidebarProps) {
+  const fetcher = (url: string) =>
+    fetch(url, { credentials: "include" }).then((res) => res.json());
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { data: userStats, error: userStatsError } = useSWR(
+    "/api/user-stats",
+    fetcher
+  );
   const router = useRouter();
 
   // Handle sign out
@@ -81,15 +90,19 @@ export default function LeftSidebar({
 
             <div className="flex gap-4 mt-3">
               <div className="text-center">
-                <p className="text-[#ffcc00] font-bold">12</p>
+                <p className="text-[#ffcc00] font-bold">{userStats.posts}</p>
                 <p className="text-xs text-gray-400">Posts</p>
               </div>
               <div className="text-center">
-                <p className="text-[#ffcc00] font-bold">48</p>
+                <p className="text-[#ffcc00] font-bold">
+                  {userStats.following}
+                </p>
                 <p className="text-xs text-gray-400">Following</p>
               </div>
               <div className="text-center">
-                <p className="text-[#ffcc00] font-bold">96</p>
+                <p className="text-[#ffcc00] font-bold">
+                  {userStats.followers}
+                </p>
                 <p className="text-xs text-gray-400">Followers</p>
               </div>
             </div>
@@ -109,7 +122,7 @@ export default function LeftSidebar({
             </div>
           </>
         )}
-      </div>
+          </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-6 px-4">

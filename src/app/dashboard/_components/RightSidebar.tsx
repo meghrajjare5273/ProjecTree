@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Link from "next/link";
@@ -9,6 +10,7 @@ import type User from "@/types/users";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
+import useSWR from "swr";
 
 interface RightSidebarProps {
   user: User | null;
@@ -19,6 +21,14 @@ export default function RightSidebar({
   user,
   trendingTopics,
 }: RightSidebarProps) {
+  const fetcher = (url: string) =>
+    fetch(url, { credentials: "include" }).then((res) => res.json());
+
+  const { data: suggestedUsers, error: suggestedUsersError } = useSWR(
+    "/api/suggested-users",
+    fetcher
+  );
+
   return (
     <div className="w-full md:w-80 order-1 md:order-2">
       {/* Create Post Card */}
@@ -103,33 +113,41 @@ export default function RightSidebar({
         <CardContent className="p-4">
           <h3 className="text-white font-medium mb-4">Suggested Users</h3>
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Avatar className="h-10 w-10 border border-[#333333]">
-                    <Image
-                      src={`/placeholder.svg?height=40&width=40&text=U${i}`}
-                      alt={`User ${i}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </Avatar>
-                  <div className="ml-3">
-                    <p className="text-white text-sm font-medium">
-                      User Name {i}
-                    </p>
-                    <p className="text-gray-500 text-xs">@username{i}</p>
+            {suggestedUsersError ? (
+              <p className="text-red-500">Failed to load suggested users</p>
+            ) : !suggestedUsers ? (
+              <p className="text-gray-500">Loading suggested users...</p>
+            ) : suggestedUsers.length === 0 ? (
+              <p className="text-gray-500">No suggested users found</p>
+            ) : (
+              suggestedUsers.map((user: any, index: number) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Avatar className="h-10 w-10 border border-[#333333]">
+                      <Image
+                        src={user.image || "/placeholder.svg"}
+                        alt={user.name || "User"}
+                        fill
+                        className="object-cover"
+                      />
+                    </Avatar>
+                    <div className="ml-3">
+                      <p className="text-white text-sm font-medium">
+                        {user.name}
+                      </p>
+                      <p className="text-gray-500 text-xs">{user.username}</p>
+                    </div>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-[#ffcc00] text-[#ffcc00] hover:bg-[#ffcc00]/10"
+                  >
+                    Follow
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-[#ffcc00] text-[#ffcc00] hover:bg-[#ffcc00]/10"
-                >
-                  Follow
-                </Button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
