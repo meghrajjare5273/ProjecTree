@@ -18,7 +18,7 @@ export async function GET() {
     const suggestedUsers = await prisma.user.findMany({
       where: {
         id: { not: session.user.id },
-        // username: { not: null }, // Only users who have completed their profile
+        username: { not: null }, // Only users who have completed their profile
         // image: { not: null }, // Only users with profile images
       },
       select: {
