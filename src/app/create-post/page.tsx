@@ -67,20 +67,29 @@ type EventFormData = z.infer<typeof eventSchema>;
 
 // Function to upload images to /api/upload
 const uploadImages = async (files: File[]): Promise<string[]> => {
-  const uploadPromises = files.map(async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await fetch("/api/upload-posts", {
-      method: "POST",
-      body: formData,
+  try {
+    const uploadPromises = files.map(async (file) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/upload-posts", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to upload ${file.name}`);
+      }
+
+      const data = await response.json();
+      console.log("Upload response:", data); // Add this for debugging
+      return data.url;
     });
-    if (!response.ok) {
-      throw new Error(`Failed to upload ${file.name}`);
-    }
-    const { url } = await response.json();
-    return url;
-  });
-  return Promise.all(uploadPromises);
+
+    return Promise.all(uploadPromises);
+  } catch (error) {
+    console.error("Error uploading images:", error);
+    return []; // Return empty array instead of failing
+  }
 };
 
 export default function CreatePost() {
@@ -184,6 +193,7 @@ export default function CreatePost() {
         images: imageUrls,
         tags: tagsArray,
       };
+      console.log(postData);
 
       // Submit to API
       const response = await fetch("/api/projects", {

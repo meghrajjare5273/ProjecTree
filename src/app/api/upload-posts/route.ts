@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    return NextResponse.json({ status: 200 }, { url: blob.url });
+    return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.log(error);
     return NextResponse.json(
