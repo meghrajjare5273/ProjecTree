@@ -1,25 +1,33 @@
+import type React from "react";
 // src/app/layout.tsx
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { constructMetadata } from "@/lib/seo";
 import "./globals.css";
-import { Inter } from "next/font/google";
+import { Inter, Poppins, Playfair_Display } from "next/font/google";
 
+// Load Inter font with more weights for better typography
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-inter",
 });
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Add Poppins as a modern alternative
+const poppins = Poppins({
   subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-poppins",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Add Playfair Display for elegant headings
+const playfair = Playfair_Display({
   subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-playfair",
 });
 
 export const metadata: Metadata = constructMetadata({});
@@ -46,7 +54,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.className} antialiased`}
+        className={`${inter.variable} ${poppins.variable} ${playfair.variable} font-poppins antialiased`}
       >
         {children}
         <SpeedInsights />

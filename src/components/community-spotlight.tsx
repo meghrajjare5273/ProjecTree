@@ -1,6 +1,15 @@
 "use client";
-import { motion } from "motion/react";
+import { motion, useScroll, useTransform } from "motion/react";
+import { useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { Playfair_Display } from "next/font/google";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+});
 
 const spotlightUsers = [
   {
@@ -33,19 +42,56 @@ const spotlightUsers = [
 ];
 
 export default function CommunitySpotlight() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
+
+  const y = useTransform(scrollYProgress, [0, 1], [50, -50]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0]);
+
+  // Track loaded images
+  const [imagesLoaded, setImagesLoaded] = useState<Record<string, boolean>>({});
+
+  const handleImageLoad = (username: string) => {
+    setImagesLoaded((prev) => ({
+      ...prev,
+      [username]: true,
+    }));
+  };
+
   return (
-    <section className="py-16 bg-gray-800">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section ref={sectionRef} className="relative py-24 overflow-hidden">
+      {/* Background with gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black to-gray-900">
+        <motion.div
+          style={{ y, opacity }}
+          className="absolute top-1/3 right-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl"
+        />
+        <motion.div
+          style={{
+            y: useTransform(scrollYProgress, [0, 1], [-50, 50]),
+            opacity,
+          }}
+          className="absolute bottom-1/3 left-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl"
+        />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-12"
+          className="text-center mb-16"
         >
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Community Spotlight
+          <h2
+            className={`${playfair.className} text-4xl md:text-5xl font-bold text-white mb-6 `}
+          >
+            Community <span className="text-yellow-400">Spotlight</span>
           </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto">
+          <p className="text-gray-300 max-w-2xl mx-auto text-lg font-inter">
             Discover amazing projects created by students in our community. Get
             inspired and connect with fellow innovators.
           </p>
@@ -56,36 +102,66 @@ export default function CommunitySpotlight() {
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="bg-gray-900 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300"
+              whileHover={{
+                y: -5,
+                boxShadow: "0 10px 30px -10px rgba(250, 204, 21, 0.2)",
+              }}
+              className="bg-black/40 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-yellow-400/30 transition-all duration-300 group"
             >
               <div className="p-6">
-                <div className="flex items-center mb-4">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4 border-2 border-yellow-400">
-                    <Image
-                      src={user.image || "/placeholder.svg"}
-                      alt={user.name}
-                      fill
-                      className="object-cover"
-                    />
+                <div className="flex items-center mb-6">
+                  <div className="relative w-14 h-14 rounded-full overflow-hidden mr-4 border-2 border-yellow-400/50 group-hover:border-yellow-400 transition-colors">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{
+                        opacity: imagesLoaded[user.username] ? 1 : 0,
+                        scale: imagesLoaded[user.username] ? 1 : 0.8,
+                      }}
+                      transition={{ duration: 0.5 }}
+                      className="w-full h-full"
+                    >
+                      <Image
+                        src={user.image || "/placeholder.svg"}
+                        alt={user.name}
+                        fill
+                        className="object-cover image-scale"
+                        onLoad={() => handleImageLoad(user.username)}
+                      />
+                    </motion.div>
                   </div>
                   <div>
-                    <h3 className="text-white font-semibold">{user.name}</h3>
-                    <p className="text-gray-400 text-sm">@{user.username}</p>
+                    <h3 className="text-white font-semibold text-lg group-hover:text-yellow-400 transition-colors font-poppins">
+                      {user.name}
+                    </h3>
+                    <p className="text-gray-400 text-sm font-inter">
+                      @{user.username}
+                    </p>
                   </div>
                 </div>
-                <div className="mb-4">
-                  <h4 className="text-yellow-400 font-medium mb-2">
+                <div className="mb-6">
+                  <h4 className="text-yellow-400 font-medium mb-2 text-lg font-poppins">
                     {user.project}
                   </h4>
-                  <p className="text-gray-300 text-sm">{user.description}</p>
+                  <p className="text-gray-300 text-sm font-inter">
+                    {user.description}
+                  </p>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-xs">{user.role}</span>
-                  <button className="text-yellow-400 text-sm hover:text-yellow-300 transition-colors">
-                    View Profile
-                  </button>
+                  <span className="text-gray-500 text-xs font-inter">
+                    {user.role}
+                  </span>
+                  <Link href={`/users/${user.username}`}>
+                    <motion.button
+                      whileHover={{ x: 5 }}
+                      className="text-yellow-400 text-sm hover:text-yellow-300 transition-colors flex items-center gap-1 group-hover:gap-2 font-inter"
+                    >
+                      View Profile
+                      <ArrowRight className="w-4 h-4" />
+                    </motion.button>
+                  </Link>
                 </div>
               </div>
             </motion.div>

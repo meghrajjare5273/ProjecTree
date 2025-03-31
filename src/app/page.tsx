@@ -1,7 +1,9 @@
+// Update the page component to use the new Footer component
 // "use client"
 import CommunitySpotlight from "@/components/community-spotlight";
 import CTASection from "@/components/cta-section";
 import FeaturesSection from "@/components/features-section";
+import Footer from "@/components/footer";
 import HeroSection from "@/components/hero";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -20,6 +22,7 @@ export default async function LandingPage() {
       <FeaturesSection />
       <CommunitySpotlight />
       <CTASection />
+      <Footer />
     </>
   );
 }
