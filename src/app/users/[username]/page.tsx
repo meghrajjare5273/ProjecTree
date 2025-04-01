@@ -19,6 +19,13 @@ import {
   Twitter,
   Mail,
 } from "lucide-react";
+// import { auth } from "@/lib/auth";
+// import { headers } from "next/headers";
+import { prisma } from "@/lib/prisma";
+import { FollowButton } from "@/components/follow-button";
+import { User } from "better-auth";
+import { authClient } from "@/lib/auth-client";
+import { Button } from "@mui/material";
 
 // Types
 type ProfileUser = {
@@ -74,9 +81,12 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
-  const [following, setFollowing] = useState(false);
+  // const [following, setFollowing] = useState(false);
   const [savedPosts, setSavedPosts] = useState<string[]>([]);
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [isFollowing, setIsFollowing] = useState<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Fetch profile data
   useEffect(() => {
@@ -92,6 +102,37 @@ export default function UserProfilePage() {
       }
     };
     loadProfileData();
+  }, [username]);
+
+  useEffect(() => {
+    const loadFollowing = async () => {
+      try {
+        const session = await authClient.getSession()!;
+        if (
+          session &&
+          session.data &&
+          session.data.user.id !== profileData?.user.id
+        ) {
+          const isTrue =
+            (await prisma.follow.findUnique({
+              where: {
+                followerId_followingId: {
+                  followerId: session.data.user.id,
+                  followingId: profileData?.user.id as string,
+                },
+              },
+            })) !== null;
+
+          setIsFollowing(isTrue);
+          setCurrentUser(session.data.user);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadFollowing();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
   // Simulate saved and liked posts (would come from API in real app)
@@ -122,9 +163,9 @@ export default function UserProfilePage() {
   };
 
   // Toggle following
-  const handleFollowToggle = () => {
-    setFollowing(!following);
-  };
+  // const handleFollowToggle = () => {
+  //   setFollowing(!following);
+  // };
 
   // Get social icon by platform
   const getSocialIcon = (platform: string) => {
@@ -256,16 +297,15 @@ export default function UserProfilePage() {
                     </div>
 
                     <div className="mt-4 sm:mt-0 flex flex-col sm:items-end gap-2">
-                      <button
-                        onClick={handleFollowToggle}
-                        className={
-                          following
-                            ? "bg-transparent border border-[#ffcc00] text-[#ffcc00] px-4 py-2 rounded-md hover:bg-[#ffcc00]/10"
-                            : "bg-[#ffcc00] text-black px-4 py-2 rounded-md hover:bg-[#e6b800]"
-                        }
-                      >
-                        {following ? "Following" : "Follow"}
-                      </button>
+                      {/* {currentUser &&
+                        currentUser.id !== profileData.user.id && ( */}
+                      <Button>
+                        <FollowButton
+                          initialIsFollowing={isFollowing}
+                          userId={profileData.user.id}
+                        />
+                      </Button>
+                      {/* )} */}
 
                       <div className="flex gap-2">
                         <button className="border border-[#333333] text-white p-2 rounded-md hover:bg-[#333333]">

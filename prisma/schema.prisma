@@ -15,43 +15,43 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String? 
-  emailVerified Boolean
-  image         String?
-  createdAt     DateTime
-  updatedAt     DateTime
-  sessions      Session[]
-  accounts      Account[]
-  projects      Project[]
-  events        Event[]
-  comments      Comment[]
-  username      String?
-  socialLinks   Json? 
-  bio           String? 
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String?
+  emailVerified    Boolean
+  image            String?
+  createdAt        DateTime
+  updatedAt        DateTime
+  sessions         Session[]
+  accounts         Account[]
+  projects         Project[]
+  events           Event[]
+  comments         Comment[]
+  username         String?
+  socialLinks      Json?
+  bio              String?
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+  following        Follow[]  @relation("FollowsAsFollower")
+  followers        Follow[]  @relation("FollowsAsFollowing")
 
-  
-
-  @@map("user")
-  @@index([username,email,id])
   @@unique([username])
+  @@index([username, email, id])
+  @@map("user")
 }
 
 model Comment {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   content   String
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId String?
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   eventId   String?
-  event     Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-  @@index([id,userId,createdAt])
+  @@index([id, userId, createdAt])
   @@map("comment")
 }
 
@@ -59,16 +59,16 @@ model Project {
   id          String    @id @default(cuid())
   title       String
   description String
-  images      String[]  // Array of image URLs
-  tags        String[]  // e.g., ["web", "AI", "hackathon"]
+  images      String[] // Array of image URLs
+  tags        String[] // e.g., ["web", "AI", "hackathon"]
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments    Comment[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  @@index([userId, id, createdAt])
   @@map("project")
-  @@index([userId,id,createdAt])
 }
 
 model Event {
@@ -85,8 +85,8 @@ model Event {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  @@index([id, userId, createdAt])
   @@map("event")
-  @@index([id,userId,createdAt])
 }
 
 model Session {
@@ -101,8 +101,8 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
+  @@index([userId, id])
   @@map("session")
-  @@index([userId,id])
 }
 
 model Account {
@@ -121,8 +121,8 @@ model Account {
   createdAt             DateTime
   updatedAt             DateTime
 
-  @@map("account")
   @@index([id])
+  @@map("account")
 }
 
 model Verification {
@@ -133,8 +133,8 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 
-  @@map("verification")
   @@index([id])
+  @@map("verification")
 }
 
 model Message {
@@ -144,10 +144,24 @@ model Message {
   receiverId String
   createdAt  DateTime @default(now())
   read       Boolean  @default(false)
-  
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([senderId, receiverId, createdAt])
   @@map("message")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("FollowsAsFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("FollowsAsFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }

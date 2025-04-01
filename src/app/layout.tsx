@@ -1,5 +1,4 @@
 import type React from "react";
-// src/app/layout.tsx
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { constructMetadata } from "@/lib/seo";

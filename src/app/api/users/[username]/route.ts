@@ -2,6 +2,8 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { ExtendedProject, ExtendedEvent } from "@/types/posts";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 
 export async function GET(
   request: Request,
@@ -26,6 +28,25 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    let isFollowing = false;
+    if (session && session.user.id) {
+      const follow = await prisma.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: session.user.id,
+            followingId: user.id,
+          },
+        },
+      });
+      isFollowing = !!follow;
+    }
+
+    const [followersCount, followingCount] = await Promise.all([
+      prisma.follow.count({ where: { followingId: user.id } }),
+      prisma.follow.count({ where: { followerId: user.id } }),
+    ]);
 
     const [projects, events] = await prisma.$transaction([
       prisma.project.findMany({
@@ -85,6 +106,9 @@ export async function GET(
             ? JSON.parse(user.socialLinks)
             : user.socialLinks
           : {},
+        followersCount,
+        followingCount,
+        isFollowing: session ? isFollowing : undefined,
       },
       posts,
     });
