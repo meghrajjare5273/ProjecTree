@@ -1,55 +1,116 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-// import errorMap from "zod/locales/en.js";
+import useSWR, { useSWRConfig } from "swr";
+// import { authClient } from "@/lib/auth-client";
 
 interface FollowButtonProps {
-  initialIsFollowing: boolean;
-  userId: string;
+  userId: string; // The ID of the user to follow/unfollow
+  username: string; // The username for profile cache key
 }
 
-export function FollowButton({
-  initialIsFollowing,
-  userId,
-}: FollowButtonProps) {
-  const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
-  //   const { toast } = useToast();
+const fetcher = (url: string) =>
+  fetch(url, { credentials: "include" }).then((res) => res.json());
 
-  const handleFollow = async () => {
-    try {
-      const response = await fetch("/api/follows", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followingId: userId }),
-      });
-      if (!response.ok) throw new Error("Failed to follow");
-      setIsFollowing(true);
-      toast.success("Followed successfully");
-    } catch (error) {
-      toast.error(`Error: ${error}`);
-    }
-  };
+export default function FollowButton({ userId, username }: FollowButtonProps) {
+  const { data, error, mutate } = useSWR(
+    `/api/follows?followingId=${userId}`,
+    fetcher
+  );
+  const { mutate: globalMutate } = useSWRConfig();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleUnfollow = async () => {
+  if (error) return <div>Error loading follow status</div>;
+  if (!data) return <button disabled>Loading...</button>;
+
+  const isFollowing = data.isFollowing;
+
+  const handleClick = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch("/api/follows", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followingId: userId }),
-      });
-      if (!response.ok) throw new Error("Failed to unfollow");
-      setIsFollowing(false);
-      toast.success("Unfollowed successfully");
+      if (isFollowing) {
+        // Optimistically update to unfollowed
+        mutate({ isFollowing: false }, false);
+        globalMutate(
+          `/api/users/${username}`,
+          (user: any) => {
+            if (user?.data) {
+              return {
+                ...user,
+                data: {
+                  ...user.data,
+                  _count: {
+                    ...user.data._count,
+                    followers: user.data._count.followers - 1,
+                  },
+                },
+              };
+            }
+            return user;
+          },
+          false
+        );
+
+        await fetch("/api/follows", {
+          method: "DELETE",
+          body: JSON.stringify({ followingId: userId }),
+        });
+
+        // Revalidate after success
+        mutate();
+        globalMutate(`/api/users/${username}`);
+      } else {
+        // Optimistically update to followed
+        mutate({ isFollowing: true }, false);
+        globalMutate(
+          `/api/users/${username}`,
+          (user: any) => {
+            if (user?.data) {
+              return {
+                ...user,
+                data: {
+                  ...user.data,
+                  _count: {
+                    ...user.data._count,
+                    followers: user.data._count.followers + 1,
+                  },
+                },
+              };
+            }
+            return user;
+          },
+          false
+        );
+
+        await fetch("/api/follows", {
+          method: "POST",
+          body: JSON.stringify({ followingId: userId }),
+        });
+
+        // Revalidate after success
+        mutate();
+        globalMutate(`/api/users/${username}`);
+      }
     } catch (error) {
-      toast.error(`Error: ${error}`);
+      // Revert on error
+      mutate({ isFollowing }, false);
+      globalMutate(`/api/users/${username}`, null, true);
+      console.error("Error following/unfollowing:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <Button onClick={isFollowing ? handleUnfollow : handleFollow}>
-      {isFollowing ? "Unfollow" : "Follow"}
-    </Button>
+    <button
+      onClick={handleClick}
+      disabled={isLoading}
+      className={`px-4 py-2 rounded-full ${
+        isFollowing ? "bg-gray-300" : "bg-blue-500 text-white"
+      }`}
+    >
+      {isLoading ? "Processing..." : isFollowing ? "Unfollow" : "Follow"}
+    </button>
   );
 }
