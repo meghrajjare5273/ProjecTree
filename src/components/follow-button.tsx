@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
-// import { authClient } from "@/lib/auth-client";
 
 interface FollowButtonProps {
   userId: string; // The ID of the user to follow/unfollow
@@ -21,10 +20,29 @@ export default function FollowButton({ userId, username }: FollowButtonProps) {
   const { mutate: globalMutate } = useSWRConfig();
   const [isLoading, setIsLoading] = useState(false);
 
-  if (error) return <div>Error loading follow status</div>;
-  if (!data) return <button disabled>Loading...</button>;
+  // Show loading state if data is not loaded yet
+  if (!data)
+    return (
+      <button
+        disabled
+        className="px-4 py-2 rounded-full bg-gray-600 text-white opacity-50"
+      >
+        Loading...
+      </button>
+    );
 
   const isFollowing = data.isFollowing;
+
+  if (error) {
+    return (
+      <button
+        disabled
+        className="px-4 py-2 rounded-full bg-gray-600 text-white opacity-50"
+      >
+        {error || "Error Loading Follow Status"}
+      </button>
+    );
+  }
 
   const handleClick = async () => {
     setIsLoading(true);
@@ -106,8 +124,10 @@ export default function FollowButton({ userId, username }: FollowButtonProps) {
     <button
       onClick={handleClick}
       disabled={isLoading}
-      className={`px-4 py-2 rounded-full ${
-        isFollowing ? "bg-gray-300" : "bg-blue-500 text-white"
+      className={`px-4 py-2 rounded-full transition-all duration-300 ${
+        isFollowing
+          ? "bg-gray-800 text-white hover:bg-gray-700"
+          : "bg-yellow-400 text-black font-semibold hover:bg-yellow-300"
       }`}
     >
       {isLoading ? "Processing..." : isFollowing ? "Unfollow" : "Follow"}

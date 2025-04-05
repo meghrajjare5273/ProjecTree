@@ -117,35 +117,6 @@ const fetchProfileData = async (username: string): Promise<ProfileData> => {
   return { user: profileUser, posts };
 };
 
-// Check if user is following - server action
-const checkIsFollowing = async (
-  currentUserId: string,
-  profileUserId: string
-): Promise<boolean> => {
-  try {
-    const response = await fetch(`/api/follow/check`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        followerId: currentUserId,
-        followingId: profileUserId,
-      }),
-    });
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    return data.isFollowing;
-  } catch (error) {
-    console.error("Error checking follow status:", error);
-    return false;
-  }
-};
-
 export default function UserProfilePage() {
   const params = useParams();
   const username = params?.username as string;
@@ -156,7 +127,6 @@ export default function UserProfilePage() {
   const [activeTab, setActiveTab] = useState("all");
   const [savedPosts, setSavedPosts] = useState<string[]>([]);
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
-  const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -180,29 +150,20 @@ export default function UserProfilePage() {
     }
   }, [username]);
 
-  // Check follow status
+  // Load current user
   useEffect(() => {
-    // Only run on client and when profileData exists
     if (typeof window !== "undefined" && profileData?.user?.id) {
-      const loadFollowing = async () => {
+      const loadCurrentUser = async () => {
         try {
           const session = await authClient.getSession();
-          if (
-            session?.data?.user?.id &&
-            session.data.user.id !== profileData.user.id // Compare IDs, not username
-          ) {
-            const isFollowingStatus = await checkIsFollowing(
-              session.data.user.id,
-              profileData.user.id // Use user.id
-            );
-            setIsFollowing(isFollowingStatus);
+          if (session?.data?.user) {
             setCurrentUser(session.data.user);
           }
         } catch (error) {
-          console.error("Error loading follow status:", error);
+          console.error("Error loading user session:", error);
         }
       };
-      loadFollowing();
+      loadCurrentUser();
     }
   }, [profileData]);
 
@@ -260,7 +221,7 @@ export default function UserProfilePage() {
   const filteredPosts = useMemo(() => {
     if (!profileData?.posts) return [];
 
-    if (activeTab === "all") return profileData.posts; // Use posts, not projects
+    if (activeTab === "all") return profileData.posts;
     if (activeTab === "projects")
       return profileData.posts.filter((post) => post.type === "project");
     if (activeTab === "events")
@@ -375,8 +336,8 @@ export default function UserProfilePage() {
                       currentUser.id !== profileData.user.id && (
                         <Button>
                           <FollowButton
-                            userId={profileData.user.id} // Use user.id
-                            username={profileData.user.username} // Use user.username
+                            userId={profileData.user.id}
+                            username={profileData.user.username}
                           />
                         </Button>
                       )}
