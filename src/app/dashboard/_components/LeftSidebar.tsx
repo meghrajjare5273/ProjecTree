@@ -33,9 +33,12 @@ interface LeftSidebarProps {
   closeMobileSidebar: () => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then((res) => res.json());
+// User stats interface
+interface UserStats {
+  posts: number;
+  followers: number;
+  following: number;
+}
 
 export default function LeftSidebar({
   user,
@@ -43,24 +46,49 @@ export default function LeftSidebar({
   closeMobileSidebar,
 }: LeftSidebarProps) {
   const router = useRouter();
-  const [userStats, setUserStats] = useState({
+  const [userStats, setUserStats] = useState<UserStats>({
     posts: 0,
     followers: 0,
     following: 0,
   });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
     const fetchUserStats = async () => {
+      if (!user) return;
+
+      setIsLoadingStats(true);
       try {
-        const res = await fetch("/api/user-stats", { credentials: "include" });
+        const res = await fetch("/api/user-stats", {
+          credentials: "include",
+          cache: "no-store", // Ensure we get fresh data each time
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP error! Status: ${res.status}`);
+        }
+
         const data = await res.json();
-        setUserStats(data);
+        setUserStats({
+          posts: data.posts || 0,
+          followers: data.followers || 0,
+          following: data.following || 0,
+        });
       } catch (error) {
         console.error("Failed to fetch user stats:", error);
+        // Keep default values on error
+      } finally {
+        setIsLoadingStats(false);
       }
     };
+
     fetchUserStats();
-  }, []);
+
+    // Set up a refresh interval to keep the stats up-to-date
+    const intervalId = setInterval(fetchUserStats, 60000); // Refresh every minute
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, [user]);
 
   // Handle sign out
   const handleSignOut = async () => {
@@ -105,18 +133,20 @@ export default function LeftSidebar({
 
             <div className="flex gap-4 mt-3">
               <div className="text-center">
-                <p className="text-[#ffcc00] font-bold">{userStats?.posts}</p>
+                <p className="text-[#ffcc00] font-bold">
+                  {isLoadingStats ? "..." : userStats.posts}
+                </p>
                 <p className="text-xs text-gray-400">Posts</p>
               </div>
               <div className="text-center">
                 <p className="text-[#ffcc00] font-bold">
-                  {userStats?.following}
+                  {isLoadingStats ? "..." : userStats.following}
                 </p>
                 <p className="text-xs text-gray-400">Following</p>
               </div>
               <div className="text-center">
                 <p className="text-[#ffcc00] font-bold">
-                  {userStats?.followers}
+                  {isLoadingStats ? "..." : userStats.followers}
                 </p>
                 <p className="text-xs text-gray-400">Followers</p>
               </div>

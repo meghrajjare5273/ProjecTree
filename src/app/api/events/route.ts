@@ -25,7 +25,7 @@ export async function GET() {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=59",
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=59",
         },
       }
     );
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { title, description, date, location, organizer } =
+    const { title, description, date, location, organizer, images } =
       await request.json();
 
     if (!title || !description || !date) {
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         date: new Date(date),
         location: location || null,
         organizer: organizer || null,
+        images: images || [], // Add this line to handle image URLs
         userId: session.user.id,
       },
       include: {

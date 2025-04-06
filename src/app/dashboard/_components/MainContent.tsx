@@ -51,6 +51,20 @@ export default function MainContent({
     return formatDistanceToNow(dateString, { addSuffix: true });
   };
 
+  // Helper function to get post image safely
+  const getPostImage = (post: Post) => {
+    // Check if images is an array and has items
+    if (Array.isArray(post.images) && post.images.length > 0) {
+      return post.images[0];
+    }
+    // Check if image is directly on the post (might be the case for events)
+    else if (post.images) {
+      return post.images[1];
+    }
+    // Fallback to placeholder
+    return "/placeholder.svg?height=256&width=512";
+  };
+
   return (
     <div className="flex-1 order-2 md:order-1">
       {/* Mobile Search */}
@@ -253,14 +267,11 @@ export default function MainContent({
                   </div>
                 )}
 
-                {post.images && post.images.length > 0 && (
+                {/* Updated image display logic to handle both structures */}
+                {(post.images?.length > 0 || post.images) && (
                   <div className="relative h-64 w-full rounded-lg overflow-hidden mb-4">
                     <Image
-                      src={
-                        post.images[0] ||
-                        "/placeholder.svg?height=256&width=512" ||
-                        "/placeholder.svg"
-                      }
+                      src={getPostImage(post)}
                       alt={post.title}
                       fill
                       className="object-cover"

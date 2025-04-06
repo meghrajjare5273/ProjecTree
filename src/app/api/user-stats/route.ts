@@ -13,8 +13,7 @@ export async function GET() {
   }
 
   try {
-    // For a real application, you would have a followers/following table
-    // This is a simplified implementation that counts projects and events as "posts"
+    // Get actual post count (projects + events)
     const [projectCount, eventCount] = await Promise.all([
       prisma.project.count({
         where: { userId: session.user.id },
@@ -24,14 +23,18 @@ export async function GET() {
       }),
     ]);
 
-    // In a real application, you would query actual follower/following relationships
-    // For now, we'll generate some reasonable numbers based on the user's activity
-    const totalPosts = projectCount + eventCount;
-    const followersCount = Math.max(20, totalPosts * 2); // Simulate some followers
-    const followingCount = Math.max(15, totalPosts); // Simulate some following
+    // Get actual follower count
+    const followersCount = await prisma.follow.count({
+      where: { followingId: session.user.id },
+    });
+
+    // Get actual following count
+    const followingCount = await prisma.follow.count({
+      where: { followerId: session.user.id },
+    });
 
     return NextResponse.json({
-      posts: totalPosts,
+      posts: projectCount + eventCount,
       followers: followersCount,
       following: followingCount,
     });

@@ -5,12 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { TrendingUp, Layers, Calendar } from "lucide-react";
 import type User from "@/types/users";
+import { useEffect, useState } from "react";
+import { mutate as globalMutate } from "swr";
 
 // UI Components
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { useEffect, useState } from "react";
 
 interface RightSidebarProps {
   user: User | null;
@@ -28,6 +29,10 @@ export default function RightSidebar({
   const [suggestedUsers, setSuggestedUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [followStates, setFollowStates] = useState<Record<string, boolean>>({});
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>(
+    {}
+  );
 
   useEffect(() => {
     const fetchSuggestedUsers = async () => {
@@ -37,6 +42,44 @@ export default function RightSidebar({
         });
         const data = await res.json();
         setSuggestedUsers(data.users);
+
+        // Initialize follow states for all users
+        const initialFollowStates: Record<string, boolean> = {};
+        const initialLoadingStates: Record<string, boolean> = {};
+
+        data.users.forEach((user: any) => {
+          initialFollowStates[user.id] = false;
+          initialLoadingStates[user.id] = true;
+        });
+
+        setFollowStates(initialFollowStates);
+        setLoadingStates(initialLoadingStates);
+
+        // Fetch follow status for each user
+        data.users.forEach(async (user: any) => {
+          try {
+            const followRes = await fetch(
+              `/api/follows?followingId=${user.id}`,
+              {
+                credentials: "include",
+              }
+            );
+            const followData = await followRes.json();
+
+            setFollowStates((prev) => ({
+              ...prev,
+              [user.id]: followData.isFollowing,
+            }));
+          } catch (err) {
+            console.error("Error fetching follow status:", err);
+          } finally {
+            setLoadingStates((prev) => ({
+              ...prev,
+              [user.id]: false,
+            }));
+          }
+        });
+
         setIsLoading(false);
       } catch (err: any) {
         setError(err.message || "Failed to load suggested users");
@@ -45,8 +88,105 @@ export default function RightSidebar({
     };
 
     fetchSuggestedUsers();
-    // console.log(suggestedUsers);
   }, []);
+
+  const handleFollowClick = async (userId: string, username: string) => {
+    // Set loading state for this specific user
+    setLoadingStates((prev) => ({
+      ...prev,
+      [userId]: true,
+    }));
+
+    const isFollowing = followStates[userId];
+
+    try {
+      if (isFollowing) {
+        // Optimistically update to unfollowed
+        setFollowStates((prev) => ({
+          ...prev,
+          [userId]: false,
+        }));
+
+        globalMutate(
+          `/api/users/${username}`,
+          (user: any) => {
+            if (user?.data) {
+              return {
+                ...user,
+                data: {
+                  ...user.data,
+                  _count: {
+                    ...user.data._count,
+                    followers: user.data._count.followers - 1,
+                  },
+                },
+              };
+            }
+            return user;
+          },
+          false
+        );
+
+        await fetch("/api/follows", {
+          method: "DELETE",
+          body: JSON.stringify({ followingId: userId }),
+        });
+
+        // Revalidate after success
+        globalMutate(`/api/follows?followingId=${userId}`);
+        globalMutate(`/api/users/${username}`);
+      } else {
+        // Optimistically update to followed
+        setFollowStates((prev) => ({
+          ...prev,
+          [userId]: true,
+        }));
+
+        globalMutate(
+          `/api/users/${username}`,
+          (user: any) => {
+            if (user?.data) {
+              return {
+                ...user,
+                data: {
+                  ...user.data,
+                  _count: {
+                    ...user.data._count,
+                    followers: user.data._count.followers + 1,
+                  },
+                },
+              };
+            }
+            return user;
+          },
+          false
+        );
+
+        await fetch("/api/follows", {
+          method: "POST",
+          body: JSON.stringify({ followingId: userId }),
+        });
+
+        // Revalidate after success
+        globalMutate(`/api/follows?followingId=${userId}`);
+        globalMutate(`/api/users/${username}`);
+      }
+    } catch (error) {
+      // Revert on error
+      setFollowStates((prev) => ({
+        ...prev,
+        [userId]: isFollowing,
+      }));
+
+      globalMutate(`/api/users/${username}`, null, true);
+      console.error("Error following/unfollowing:", error);
+    } finally {
+      setLoadingStates((prev) => ({
+        ...prev,
+        [userId]: false,
+      }));
+    }
+  };
 
   return (
     <div className="w-full md:w-80 order-1 md:order-2">
@@ -159,11 +299,21 @@ export default function RightSidebar({
                     </div>
                   </div>
                   <Button
+                    onClick={() => handleFollowClick(user.id, user.username)}
+                    disabled={loadingStates[user.id]}
                     variant="outline"
                     size="sm"
-                    className="border-[#ffcc00] text-[#ffcc00] hover:bg-[#ffcc00]/10"
+                    className={`${
+                      followStates[user.id]
+                        ? "border-gray-500 text-gray-300"
+                        : "border-[#ffcc00] text-[#ffcc00] hover:bg-[#ffcc00]/10"
+                    }`}
                   >
-                    Follow
+                    {loadingStates[user.id]
+                      ? "Processing..."
+                      : followStates[user.id]
+                      ? "Unfollow"
+                      : "Follow"}
                   </Button>
                 </div>
               ))
