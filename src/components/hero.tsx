@@ -74,7 +74,8 @@ export default function HeroSection() {
             fill
             className="object-cover"
             priority
-            quality={100}
+            // loading="lazy"
+            quality={75}
           />
         </motion.div>
 

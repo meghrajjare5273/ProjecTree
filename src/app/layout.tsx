@@ -47,6 +47,11 @@ export default function RootLayout({
         {/* Preconnect to domains you'll be fetching from */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
+          rel="preload"
+          as="image"
+          href="/pexels-buro-millennial-636760-1438072.jpg"
+        />
+        <link
           rel="preconnect"
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"

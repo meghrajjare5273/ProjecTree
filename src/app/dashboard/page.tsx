@@ -9,12 +9,24 @@ import type Post from "@/types/posts";
 import type { Event, Project } from "@/types/posts";
 
 // Components
-import Navbar from "./_components/Navbar";
-import MainContent from "./_components/MainContent";
-import RightSidebar from "./_components/RightSidebar";
-import LeftSidebar from "./_components/LeftSidebar";
+// import Navbar from "./_components/Navbar";
+// import MainContent from "./_components/MainContent";
+// import RightSidebar from "./_components/RightSidebar";
+// import LeftSidebar from "./_components/LeftSidebar";
 // Icons
 import { Menu, X } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const LeftSidebar = dynamic(() => import("./_components/LeftSidebar"), {
+  ssr: false,
+});
+const RightSidebar = dynamic(() => import("./_components/RightSidebar"), {
+  ssr: false,
+});
+const MainContent = dynamic(() => import("./_components/MainContent"), {
+  ssr: false,
+});
+const Navbar = dynamic(() => import("./_components/Navbar"), { ssr: false });
 
 // Fetcher function for SWR
 const fetcher = (url: string) =>
