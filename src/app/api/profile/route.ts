@@ -13,12 +13,13 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const { username, bio, socialLinks, profileImage } = await request.json();
+    const { username, bio, socialLinks, profileImage, email } = await request.json();
 
     if (username != session.user.username) {
       const isUser = await prisma.user.findUnique({
         where: {
           username: username,
+          email: email
         },
       });
 
