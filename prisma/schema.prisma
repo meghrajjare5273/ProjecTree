@@ -35,7 +35,7 @@ model User {
   following        Follow[]  @relation("FollowsAsFollower")
   followers        Follow[]  @relation("FollowsAsFollowing")
 
-  @@unique([username, email])
+  @@unique([username])
   @@index([username, email, id])
   @@map("user")
 }

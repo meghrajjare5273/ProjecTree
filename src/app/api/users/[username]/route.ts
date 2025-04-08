@@ -9,7 +9,9 @@ export async function GET(
 
   try {
     const user = await prisma.user.findUnique({
-      where: { username },
+      where: {
+        username: username,
+      },
       include: {
         projects: {
           include: {
