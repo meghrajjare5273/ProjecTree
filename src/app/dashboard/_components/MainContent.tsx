@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Bookmark,
   Calendar,
+  Clock,
 } from "lucide-react";
 import type Post from "@/types/posts";
 
@@ -255,15 +256,25 @@ export default function MainContent({
                 </p>
 
                 {post.type === "event" && post.date && (
-                  <div className="flex items-center text-sm text-gray-400 mb-3">
-                    <Calendar className="w-4 h-4 mr-2 text-[#ffcc00]" />
-                    <span>
-                      {new Date(post.date).toLocaleDateString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
+                  <div>
+                    <div className="flex justify-normal text-sm text-gray-400 mb-3">
+                      <Calendar className="w-4 h-4 mr-2 text-[#ffcc00]" />
+                      <span>
+                        {new Date(post.date).toLocaleDateString(undefined, {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex items-end justify-normal text-sm text-gray-400 mb-3">
+                      <Clock className="w-4 h-4 mr-2 text-[#ffcc00]" />
+                      <span>
+                        {new Date(post.date).toLocaleTimeString(undefined, {
+                          hour12: true,
+                        })}
+                      </span>
+                    </div>
                   </div>
                 )}
 
