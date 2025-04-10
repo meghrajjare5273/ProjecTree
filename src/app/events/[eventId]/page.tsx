@@ -15,10 +15,10 @@ import RelatedEvents from "./_components/RelatedEvents";
 export async function generateMetadata({
   params,
 }: {
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }): Promise<Metadata> {
   const event = await prisma.event.findUnique({
-    where: { id: params.eventId },
+    where: { id: (await params).eventId },
     select: { title: true, description: true },
   });
 

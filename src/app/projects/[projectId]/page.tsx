@@ -15,10 +15,10 @@ import RelatedProjects from "./_components/RelatedProjects";
 export async function generateMetadata({
   params,
 }: {
-  params: { projectId: string };
+  params: Promise<{ projectId: string }>;
 }): Promise<Metadata> {
   const project = await prisma.project.findUnique({
-    where: { id: params.projectId },
+    where: { id: (await params).projectId },
     select: { title: true, description: true, tags: true },
   });
 
