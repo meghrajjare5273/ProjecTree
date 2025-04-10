@@ -41,7 +41,7 @@ export async function generateMetadata({
 export default async function ProjectPage({
   params,
 }: {
-  params: { projectId: string };
+  params: Promise<{ projectId: string }>;
 }) {
   // Get current user session
   const session = await auth.api.getSession({
@@ -50,7 +50,7 @@ export default async function ProjectPage({
 
   // Fetch project data
   const project = await prisma.project.findUnique({
-    where: { id: params.projectId },
+    where: { id: (await params).projectId },
     include: {
       user: {
         select: {

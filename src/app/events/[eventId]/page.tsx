@@ -40,7 +40,7 @@ export async function generateMetadata({
 export default async function EventPage({
   params,
 }: {
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }) {
   // Get current user session
   const session = await auth.api.getSession({
@@ -49,7 +49,7 @@ export default async function EventPage({
 
   // Fetch event data
   const event = await prisma.event.findUnique({
-    where: { id: params.eventId },
+    where: { id: (await params).eventId },
     include: {
       user: {
         select: {
