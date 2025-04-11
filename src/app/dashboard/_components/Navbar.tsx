@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Bell, MessageSquare } from "lucide-react";
+import { Bell, MessageSquare } from "lucide-react";
 import type User from "@/types/users";
 
 // UI Components
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchDialog } from "@/components/ui/search-dialog";
 
 interface NavbarProps {
   user: User | null;
@@ -43,14 +44,7 @@ export default function Navbar({
         {/* Search Bar */}
         <div className="hidden md:flex flex-1 justify-center">
           <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Search posts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-[#252525] border-[#333333] pl-10 pr-4 py-2 rounded-full text-white w-full focus-visible:ring-[#ffcc00]/30"
-            />
+            <SearchDialog />
           </div>
         </div>
 
