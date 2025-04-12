@@ -15,6 +15,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  if (
+    session &&
+    (!session.user.username || session.user.username.trim() === "")
+  ) {
+    return NextResponse.redirect(new URL("/complete-profile", request.url));
+  }
+
   if (!session) {
     return NextResponse.redirect(new URL("/auth?mode=signin", request.url));
   }
@@ -23,5 +30,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard", "/complete-profile", "/create-post"], // Apply middleware to specific routes
+  matcher: ["/dashboard", "/create-post"], // Apply middleware to specific routes
 };
