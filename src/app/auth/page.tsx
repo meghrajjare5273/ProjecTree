@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,14 +9,47 @@ import dynamic from "next/dynamic";
 const SignIn = dynamic(() => import("@/components/signin"), { ssr: false });
 const SignUp = dynamic(() => import("@/components/signup"), { ssr: false });
 
+// Loading fallback component with improved styling
+function AuthFormSkeleton() {
+  return (
+    <div className="space-y-4 p-4">
+      <div className="space-y-2">
+        <div className="h-5 w-32 bg-gray-700 rounded animate-pulse"></div>
+        <div className="h-11 w-full bg-gray-700 rounded animate-pulse"></div>
+      </div>
+      <div className="space-y-2">
+        <div className="h-5 w-32 bg-gray-700 rounded animate-pulse"></div>
+        <div className="h-11 w-full bg-gray-700 rounded animate-pulse"></div>
+      </div>
+      <div className="h-11 w-full bg-gray-700 rounded animate-pulse mt-4"></div>
+      <div className="flex justify-center py-4">
+        <div className="h-5 w-48 bg-gray-700 rounded animate-pulse"></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-11 bg-gray-700 rounded animate-pulse"></div>
+        <div className="h-11 bg-gray-700 rounded animate-pulse"></div>
+      </div>
+    </div>
+  );
+}
+
 // Separate component to handle URL params
 function AuthContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = React.useState(() => {
+  const [activeTab, setActiveTab] = useState(() => {
     const mode = searchParams.get("mode");
     return mode === "signin" || mode === "signup" ? mode : "signup";
   });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate loading for better UX
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle tab changes
   const handleTabChange = (tab: "signin" | "signup") => {
@@ -84,9 +117,64 @@ function AuthContent() {
             transition={{ duration: 0.3 }}
             className="h-full"
           >
-            {activeTab === "signin" ? <SignIn /> : <SignUp />}
+            {isLoading ? (
+              <AuthFormSkeleton />
+            ) : activeTab === "signin" ? (
+              <SignIn />
+            ) : (
+              <SignUp />
+            )}
           </motion.div>
         </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// Main Auth Page component
+export default function AuthPage() {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  return (
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
+      {/* Background Image with Gradient */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/pexels-enginakyurt-2943603.jpg"
+          alt="Background"
+          fill
+          className={`object-cover transition-opacity duration-700 ${
+            imageLoaded ? "opacity-100" : "opacity-0"
+          }`}
+          priority
+          onLoad={() => setImageLoaded(true)}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-gray-900/80 to-black/90 backdrop-blur-sm" />
+      </div>
+
+      {/* Loading indicator while image loads */}
+      {!imageLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+          <div className="w-16 h-16 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+
+      {/* Main Content with Suspense */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: imageLoaded ? 1 : 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="w-full px-4 z-20"
+      >
+        <Suspense fallback={<LoadingFallback />}>
+          <AuthContent />
+        </Suspense>
+      </motion.div>
+
+      {/* Background Decorative Elements */}
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl" />
       </div>
     </div>
   );
@@ -106,43 +194,7 @@ function LoadingFallback() {
         </div>
       </div>
       <div className="lg:w-7/12 p-8 lg:p-12 bg-gray-900/50">
-        <div className="space-y-4 animate-pulse">
-          <div className="h-12 bg-gray-700 rounded" />
-          <div className="h-12 bg-gray-700 rounded" />
-          <div className="h-12 bg-gray-700 rounded" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Main Auth Page component
-export default function AuthPage() {
-  return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
-      {/* Background Image with Gradient */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="/pexels-enginakyurt-2943603.jpg"
-          alt="Background"
-          fill
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-gray-900/80 to-black/90 backdrop-blur-sm" />
-      </div>
-
-      {/* Main Content with Suspense */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <Suspense fallback={<LoadingFallback />}>
-          <AuthContent />
-        </Suspense>
-      </motion.div>
-
-      {/* Background Decorative Elements */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl" />
+        <AuthFormSkeleton />
       </div>
     </div>
   );
