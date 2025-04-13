@@ -1,131 +1,70 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { motion, AnimatePresence } from "motion/react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import Image from "next/image";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  TextField,
-  Typography,
-  Avatar,
-  InputAdornment,
-  LinearProgress,
-} from "@mui/material";
-import { styled } from "@mui/material/styles";
-import {
-  GitHub,
-  LinkedIn,
-  Person,
-  Description,
-  AddAPhoto,
-} from "@mui/icons-material";
+import { motion, AnimatePresence } from "motion/react";
 
-const profileSchema = z.object({
-  username: z
-    .string()
-    .min(3, "Username must be at least 3 characters")
-    .max(30, "Username must be less than 30 characters")
-    .regex(
-      /^[a-zA-Z0-9_-]+$/,
-      "Username can only contain letters, numbers, underscores, and dashes"
-    ),
-  bio: z.string().max(160, "Bio must be less than 160 characters").optional(),
-  github: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  linkedin: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  profileImage: z
-    .string()
-    .url("Must be a valid URL")
-    .optional()
-    .or(z.literal("")),
-});
+// Import components
+import BiographyStep from "./_components/biography-step";
+import InterestsStep from "./_components/interests-step";
+import PersonalInfoStep from "./_components/personal-info-step";
+import ProfileCompletionCard from "./_components/profile-completion-card";
+import ProfilePhotoStep from "./_components/profile-photo-step";
+import SkillsStep from "./_components/skills-step";
+import StepIndicator from "./_components/step-indicator";
 
-type ProfileFormData = z.infer<typeof profileSchema>;
+// UI Components
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
-// Styled Components with MUI
-const StyledTextField = styled(TextField)({
-  "& .MuiOutlinedInput-root": {
-    color: "#fff",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: "10px",
-    "& fieldset": {
-      borderColor: "rgba(255, 255, 255, 0.3)",
-    },
-    "&:hover fieldset": {
-      borderColor: "#facc15",
-    },
-    "&.Mui-focused fieldset": {
-      borderColor: "#facc15",
-      boxShadow: "0 0 8px rgba(250, 204, 21, 0.5)",
-    },
-  },
-  "& .MuiInputLabel-root": {
-    color: "rgba(255, 255, 255, 0.7)",
-    "&.Mui-focused": {
-      color: "#facc15",
-    },
-  },
-  "& .MuiFormHelperText-root": {
-    color: "#ff6b6b",
-  },
-});
-
-const StyledFileInput = styled("input")({
-  display: "none",
-});
-
-// Animation Variants
-const containerVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { delay: 0.2, duration: 0.5 } },
+// Types based on Prisma schema
+type UserData = {
+  id: string;
+  username: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+  bio: string | null;
+  socialLinks: {
+    github?: string;
+    linkedin?: string;
+    twitter?: string;
+    website?: string;
+    [key: string]: string | undefined;
+  } | null;
+  // Additional fields for the form
+  firstName: string;
+  lastName: string;
+  location: string;
+  skills: string[];
+  interests: string[];
+  profilePhoto: string;
 };
-
-const formVariants = {
-  hidden: { opacity: 0, x: 20 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-  exit: { opacity: 0, x: -20, transition: { duration: 0.3 } },
-};
-
-// Loading Animation Component
-const LoadingAnimation = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center">
-    <motion.div
-      animate={{ scale: [1, 1.2, 1] }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-    >
-      <CircularProgress size={60} sx={{ color: "#facc15" }} />
-    </motion.div>
-    <motion.p
-      className="text-gray-300 mt-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.5 }}
-    >
-      Loading your profile...
-    </motion.p>
-  </div>
-);
 
 export default function CompleteProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setValue,
-  } = useForm<ProfileFormData>({
-    resolver: zodResolver(profileSchema),
+  const [currentStep, setCurrentStep] = useState(1);
+  const [completionPercentage, setCompletionPercentage] = useState(0);
+  const [userData, setUserData] = useState<UserData>({
+    id: "",
+    username: "",
+    name: "",
+    email: "",
+    image: null,
+    bio: null,
+    socialLinks: null,
+    firstName: "",
+    lastName: "",
+    location: "",
+    skills: [],
+    interests: [],
+    profilePhoto: "",
   });
 
   useEffect(() => {
@@ -141,71 +80,131 @@ export default function CompleteProfilePage() {
         credentials: "include",
       });
       const { user } = await response.json();
-      console.log(user);
+
       if (user) {
-        setValue("username", user.username || "");
-        setValue("bio", user.bio || "");
-        setValue("github", user.socialLinks?.github || "");
-        setValue("linkedin", user.socialLinks?.linkedin || "");
-        setValue("profileImage", user.image || "");
-        if (user.image) setImagePreview(user.image);
+        // Split name into first and last name if available
+        let firstName = "";
+        let lastName = "";
+        if (user.name) {
+          const nameParts = user.name.split(" ");
+          firstName = nameParts[0] || "";
+          lastName = nameParts.slice(1).join(" ") || "";
+        }
+
+        setUserData({
+          id: user.id || "",
+          username: user.username || "",
+          name: user.name || "",
+          email: user.email || "",
+          image: user.image || null,
+          bio: user.bio || "",
+          socialLinks: user.socialLinks || {
+            github: "",
+            linkedin: "",
+            twitter: "",
+            website: "",
+          },
+          firstName,
+          lastName,
+          location: "",
+          skills: [],
+          interests: [],
+          profilePhoto: user.image || "",
+        });
+
+        // Calculate initial completion percentage
+        calculateCompletionPercentage({
+          ...userData,
+          username: user.username || "",
+          bio: user.bio || "",
+          image: user.image || null,
+          socialLinks: user.socialLinks || null,
+        });
       }
       setLoading(false);
     };
     checkSession();
-  }, [router, setValue]);
+  }, []);
 
-  const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Update user data
+  const updateUserData = (data: Partial<UserData>) => {
+    const updatedData = { ...userData, ...data };
+    setUserData(updatedData);
+    calculateCompletionPercentage(updatedData);
+  };
 
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
+  // Calculate completion percentage
+  const calculateCompletionPercentage = (data: Partial<UserData>) => {
+    let percentage = 0;
 
-    try {
-      setImageUploading(true);
-      const formData = new FormData();
-      formData.append("file", file);
+    // Basic info (20%)
+    if (data.username && data.firstName && data.lastName) percentage += 20;
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+    // Profile photo (20%)
+    if (data.profilePhoto || data.image) percentage += 20;
 
-      if (!response.ok) {
-        const { error } = await response.json();
-        throw new Error(error);
-      }
+    // Interests (20%)
+    if (data.interests && data.interests.length > 0) percentage += 20;
 
-      const { url } = await response.json();
-      setValue("profileImage", url);
-      toast.success("Image uploaded successfully!");
-    } catch (error: any) {
-      console.error("Image upload error:", error);
-      toast.error(error.message || "Failed to upload image");
-    } finally {
-      setImageUploading(false);
+    // Skills (20%)
+    if (data.skills && data.skills.length > 0) percentage += 20;
+
+    // Bio and social links (20%)
+    if (
+      data.bio &&
+      data.socialLinks &&
+      (data.socialLinks.github ||
+        data.socialLinks.linkedin ||
+        data.socialLinks.twitter ||
+        data.socialLinks.website)
+    ) {
+      percentage += 20;
+    }
+
+    setCompletionPercentage(percentage);
+  };
+
+  // Handle next step
+  const handleNextStep = () => {
+    if (currentStep < 5) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      handleSubmit();
     }
   };
 
-  const onSubmit = async (data: ProfileFormData) => {
+  // Handle previous step
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async () => {
     try {
+      setLoading(true);
+
+      // Prepare data for API
       const socialLinks = {
-        github: data.github || null,
-        linkedin: data.linkedin || null,
+        github: userData.socialLinks?.github || null,
+        linkedin: userData.socialLinks?.linkedin || null,
+        twitter: userData.socialLinks?.twitter || null,
+        website: userData.socialLinks?.website || null,
       };
+
+      // Combine first and last name
+      const name = `${userData.firstName} ${userData.lastName}`.trim();
 
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: data.username,
-          bio: data.bio || null,
+          username: userData.username,
+          name,
+          bio: userData.bio,
           socialLinks,
-          profileImage: data.profileImage || null,
+          profileImage: userData.profilePhoto,
         }),
         credentials: "include",
       });
@@ -219,6 +218,7 @@ export default function CompleteProfilePage() {
       router.push("/dashboard");
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
+      setLoading(false);
     }
   };
 
@@ -235,10 +235,25 @@ export default function CompleteProfilePage() {
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-gray-900/80 to-black/90 backdrop-blur-sm" />
         </div>
-        <LoadingAnimation />
-        <div className="fixed top-0 left-0 w-full h-full pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl" />
+        <div className="min-h-screen flex flex-col items-center justify-center">
+          <motion.div
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{
+              duration: 1.5,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
+          >
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-400"></div>
+          </motion.div>
+          <motion.p
+            className="text-gray-300 mt-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            Loading your profile...
+          </motion.p>
         </div>
       </div>
     );
@@ -262,214 +277,141 @@ export default function CompleteProfilePage() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="relative z-10 w-full max-w-5xl mx-auto flex flex-col lg:flex-row items-stretch bg-black/30 backdrop-blur-md rounded-3xl overflow-hidden shadow-2xl"
+        className="relative z-10 w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-stretch gap-6 px-4 py-8"
       >
         {/* Left Panel - Welcome Section */}
-        <div className="lg:w-5/12 p-8 lg:p-12 relative overflow-hidden">
+        <div className="lg:w-1/3 space-y-6">
           <motion.div
-            variants={containerVariants}
+            variants={{
+              hidden: { opacity: 0, y: 20 },
+              visible: { opacity: 1, y: 0 },
+            }}
             initial="hidden"
             animate="visible"
-            className="relative z-10"
+            transition={{ duration: 0.5 }}
+            className="bg-black/30 backdrop-blur-md rounded-xl border border-gray-800 p-6"
           >
-            <Typography
-              variant="h3"
-              className="text-white font-bold mb-4"
-              sx={{ fontSize: { xs: "2rem", lg: "2.5rem" } }}
-            >
-              Welcome To <b>Projec</b>
-              <b className="text-yellow-400">Tree</b>
-            </Typography>
-            <br></br>
-            <br></br>
-            <Typography
-              variant="body1"
-              className="text-gray-300 mb-8"
-              sx={{ fontSize: { xs: "1rem", lg: "1.125rem" } }}
-            >
-              Complete your profile to unlock the full ProjecTree experience.
-            </Typography>
+            <h1 className="text-2xl font-bold text-white mb-4">
+              Welcome to <span className="text-yellow-400">ProjecTree</span>
+            </h1>
+            <p className="text-gray-300 mb-6">
+              Complete your profile to connect with other students, showcase
+              your projects, and discover events on campus.
+            </p>
+            <StepIndicator currentStep={currentStep} totalSteps={5} />
           </motion.div>
 
-          {/* Decorative Elements */}
-          <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-yellow-400/10 rounded-full blur-3xl" />
-          <div className="absolute -top-32 -right-32 w-64 h-64 bg-yellow-400/10 rounded-full blur-3xl" />
+          <motion.div
+            variants={{
+              hidden: { opacity: 0, y: 20 },
+              visible: { opacity: 1, y: 0 },
+            }}
+            initial="hidden"
+            animate="visible"
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <ProfileCompletionCard percentage={completionPercentage} />
+          </motion.div>
         </div>
 
         {/* Right Panel - Form Section */}
-        <div className="lg:w-7/12 p-8 lg:p-12 bg-gray-900/50">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key="profile-form"
-              variants={formVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="h-full"
-            >
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <Box display="flex" flexDirection="column" gap={4}>
-                  {/* Profile Image */}
-                  <Box textAlign="center">
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Avatar
-                        src={imagePreview || ""}
-                        sx={{
-                          width: { xs: 100, lg: 120 },
-                          height: { xs: 100, lg: 120 },
-                          mb: 2,
-                          border: "2px solid #facc15",
-                        }}
-                      />
-                      <label htmlFor="profile-image">
-                        <StyledFileInput
-                          id="profile-image"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                        />
-                        <Button
-                          component="span"
-                          variant="outlined"
-                          startIcon={
-                            imageUploading ? (
-                              <CircularProgress
-                                size={16}
-                                sx={{ color: "#facc15" }}
-                              />
-                            ) : (
-                              <AddAPhoto />
-                            )
-                          }
-                          disabled={imageUploading}
-                          className={`px-6 py-2 rounded-full transition-all duration-300 ${
-                            imageUploading
-                              ? "text-gray-400"
-                              : "text-white hover:bg-white/10"
-                          }`}
-                        >
-                          {imageUploading ? "Uploading..." : "Upload Photo"}
-                        </Button>
-                      </label>
-                      {errors.profileImage && (
-                        <Typography
-                          color="error"
-                          variant="caption"
-                          sx={{ mt: 1 }}
-                        >
-                          {errors.profileImage.message}
-                        </Typography>
-                      )}
-                      {imageUploading && (
-                        <LinearProgress
-                          sx={{
-                            mt: 1,
-                            bgcolor: "rgba(250, 204, 21, 0.2)",
-                            "& .MuiLinearProgress-bar": { bgcolor: "#facc15" },
-                          }}
-                        />
-                      )}
-                    </motion.div>
-                  </Box>
-
-                  {/* Form Fields */}
-                  <StyledTextField
-                    fullWidth
-                    label="Username"
-                    error={!!errors.username}
-                    helperText={errors.username?.message}
-                    {...register("username")}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Person sx={{ color: "rgba(255,255,255,0.7)" }} />
-                        </InputAdornment>
-                      ),
-                    }}
+        <div className="lg:w-2/3">
+          <Card className="bg-black/30 backdrop-blur-md border-gray-800 p-6">
+            <AnimatePresence mode="wait">
+              {currentStep === 1 && (
+                <motion.div
+                  key="personal-info"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <PersonalInfoStep
+                    userData={userData}
+                    updateUserData={updateUserData}
                   />
+                </motion.div>
+              )}
 
-                  <StyledTextField
-                    fullWidth
-                    label="Bio"
-                    error={!!errors.bio}
-                    helperText={errors.bio?.message}
-                    {...register("bio")}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Description
-                            sx={{ color: "rgba(255,255,255,0.7)" }}
-                          />
-                        </InputAdornment>
-                      ),
-                    }}
+              {currentStep === 2 && (
+                <motion.div
+                  key="profile-photo"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ProfilePhotoStep
+                    userData={userData}
+                    updateUserData={updateUserData}
                   />
+                </motion.div>
+              )}
 
-                  <StyledTextField
-                    fullWidth
-                    label="GitHub URL"
-                    error={!!errors.github}
-                    helperText={errors.github?.message}
-                    {...register("github")}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <GitHub sx={{ color: "rgba(255,255,255,0.7)" }} />
-                        </InputAdornment>
-                      ),
-                    }}
+              {currentStep === 3 && (
+                <motion.div
+                  key="interests"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <InterestsStep
+                    userData={userData}
+                    updateUserData={updateUserData}
                   />
+                </motion.div>
+              )}
 
-                  <StyledTextField
-                    fullWidth
-                    label="LinkedIn URL"
-                    error={!!errors.linkedin}
-                    helperText={errors.linkedin?.message}
-                    {...register("linkedin")}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LinkedIn sx={{ color: "rgba(255,255,255,0.7)" }} />
-                        </InputAdornment>
-                      ),
-                    }}
+              {currentStep === 4 && (
+                <motion.div
+                  key="skills"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <SkillsStep
+                    userData={userData}
+                    updateUserData={updateUserData}
                   />
+                </motion.div>
+              )}
 
-                  {/* Submit Button */}
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || imageUploading}
-                      fullWidth
-                      className={`px-6 py-2 rounded-full transition-all duration-300 ${
-                        isSubmitting || imageUploading
-                          ? "bg-yellow-400/50 text-gray-600"
-                          : "bg-yellow-400 text-black hover:bg-yellow-300"
-                      } font-semibold`}
-                    >
-                      {isSubmitting ? (
-                        <Box display="flex" alignItems="center" gap={2}>
-                          <CircularProgress
-                            size={16}
-                            sx={{ color: "#1e1e1e" }}
-                          />
-                          Saving...
-                        </Box>
-                      ) : (
-                        "Save Profile"
-                      )}
-                    </Button>
-                  </motion.div>
-                </Box>
-              </form>
-            </motion.div>
-          </AnimatePresence>
+              {currentStep === 5 && (
+                <motion.div
+                  key="biography"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <BiographyStep
+                    userData={userData}
+                    updateUserData={updateUserData}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex justify-between mt-8">
+              <Button
+                variant="outline"
+                onClick={handlePrevStep}
+                disabled={currentStep === 1 || loading}
+                className="border-gray-700 text-gray-300 hover:bg-gray-800/50"
+              >
+                Previous
+              </Button>
+              <Button
+                onClick={handleNextStep}
+                disabled={loading}
+                className="bg-yellow-400 hover:bg-yellow-300 text-black font-medium"
+              >
+                {currentStep === 5 ? "Complete Profile" : "Next Step"}
+              </Button>
+            </div>
+          </Card>
         </div>
       </motion.div>
 
