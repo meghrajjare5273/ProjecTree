@@ -31,16 +31,8 @@ export function SearchDialog() {
   const debouncedQuery = useDebounce(query, 300);
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [mounted, setMounted] = React.useState(false);
-
-  // Only run client-side
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   React.useEffect(() => {
-    if (!mounted) return;
-
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -50,7 +42,7 @@ export function SearchDialog() {
 
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, [mounted]);
+  }, []);
 
   React.useEffect(() => {
     if (!debouncedQuery || debouncedQuery.length < 2) {
@@ -58,42 +50,30 @@ export function SearchDialog() {
       return;
     }
 
-    const controller = new AbortController();
-    const signal = controller.signal;
-
     const fetchResults = async () => {
       setLoading(true);
       try {
         const response = await fetch(
-          `/api/search?q=${encodeURIComponent(debouncedQuery)}`,
-          { signal }
+          `/api/search?q=${encodeURIComponent(debouncedQuery)}`
         );
         if (response.ok) {
           const data = await response.json();
           setResults(data.results);
         }
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          console.error("Search error:", error);
-        }
+        console.error("Search error:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchResults();
-
-    return () => {
-      controller.abort();
-    };
   }, [debouncedQuery]);
 
   const handleSelect = (result: SearchResult) => {
     setOpen(false);
     router.push(result.url);
   };
-
-  if (!mounted) return null;
 
   return (
     <>
@@ -109,7 +89,11 @@ export function SearchDialog() {
           <span className="text-xs">⌘</span>K
         </kbd>
       </Button>
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandDialog
+        open={open}
+        onOpenChange={setOpen}
+        // Remove className from here
+      >
         <div className="bg-[#1a1a1a] border-[#333333] text-white">
           <CommandInput
             placeholder="Search projects, events, and users..."
@@ -117,7 +101,7 @@ export function SearchDialog() {
             onValueChange={setQuery}
             className="border-b-[#333333] text-white placeholder:text-gray-500 bg-[#1a1a1a]"
           />
-          <CommandList className="bg-[#1a1a1a] text-white max-h-[300px]">
+          <CommandList className="bg-[#1a1a1a] text-white">
             {loading ? (
               <div className="p-4 space-y-3">
                 <Skeleton className="h-8 w-full bg-[#252525]" />
@@ -134,7 +118,6 @@ export function SearchDialog() {
                     <CommandGroup heading="Projects" className="text-gray-300">
                       {results
                         .filter((result) => result.type === "project")
-                        .slice(0, 5)
                         .map((result) => (
                           <CommandItem
                             key={result.id}
@@ -156,7 +139,6 @@ export function SearchDialog() {
                     <CommandGroup heading="Events" className="text-gray-300">
                       {results
                         .filter((result) => result.type === "event")
-                        .slice(0, 5)
                         .map((result) => (
                           <CommandItem
                             key={result.id}
@@ -178,7 +160,6 @@ export function SearchDialog() {
                     <CommandGroup heading="Users" className="text-gray-300">
                       {results
                         .filter((result) => result.type === "user")
-                        .slice(0, 5)
                         .map((result) => (
                           <CommandItem
                             key={result.id}

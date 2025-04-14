@@ -5,27 +5,27 @@ import { constructMetadata } from "@/lib/seo";
 import "./globals.css";
 import { Inter, Poppins, Playfair_Display } from "next/font/google";
 
-// Load fonts with display=swap for better performance
+// Load Inter font with more weights for better typography
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700"], // Reduce number of font weights
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-inter",
 });
 
-// Reduce font weights for better performance
+// Add Poppins as a modern alternative
 const poppins = Poppins({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700"], // Reduce number of font weights
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-poppins",
 });
 
-// Reduce font weights for better performance
+// Add Playfair Display for elegant headings
 const playfair = Playfair_Display({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "700"], // Reduce number of font weights
+  weight: ["400", "500", "600", "700", "800", "900"],
   variable: "--font-playfair",
 });
 
@@ -46,6 +46,11 @@ export default function RootLayout({
 
         {/* Preconnect to domains you'll be fetching from */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preload"
+          as="image"
+          href="/pexels-buro-millennial-636760-1438072.jpg"
+        />
         <link
           rel="preconnect"
           href="https://fonts.gstatic.com"

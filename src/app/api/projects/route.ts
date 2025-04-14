@@ -1,21 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { type NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 
 // Fetch all projects (GET)
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Get query parameters for pagination and filtering
-    const { searchParams } = new URL(request.url);
-    const limit = Number.parseInt(searchParams.get("limit") || "20");
-    const page = Number.parseInt(searchParams.get("page") || "1");
-    const skip = (page - 1) * limit;
-
-    // Get total count for pagination
-    const totalCount = await prisma.project.count();
-
-    // Fetch projects with pagination
     const projects = await prisma.project.findMany({
       include: {
         user: {
@@ -28,21 +18,10 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: "desc",
       },
-      take: limit,
-      skip: skip,
     });
 
-    // Set cache headers for better performance
     return NextResponse.json(
-      {
-        data: projects,
-        pagination: {
-          total: totalCount,
-          page,
-          limit,
-          pages: Math.ceil(totalCount / limit),
-        },
-      },
+      { data: projects },
       {
         status: 200,
         headers: {
