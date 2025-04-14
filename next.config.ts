@@ -11,10 +11,20 @@ const nextConfig: NextConfig = {
         hostname: "lh3.googleusercontent.com",
       },
     ],
+    //  formats: ["image/avif", "image/webp"],
   },
   experimental: {
-    optimizePackageImports: ["@chakra-ui/react"],
+    optimizePackageImports: [
+      "@chakra-ui/react",
+      "lucide-react",
+      "@mui/material",
+      "@mui/icons-material",
+      "react-icons",
+    ],
+    serverComponentsHmrCache: true,
   },
+  compress: true,
+  poweredByHeader: false,
 };
 export default nextConfig;
 
