@@ -13,12 +13,20 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const { username, bio, socialLinks, profileImage } = await request.json();
+    const {
+      username,
+      bio,
+      socialLinks,
+      interests,
+      skills,
+      profileImage,
+      location,
+    } = await request.json();
 
     if (username != session.user.username) {
       const isUser = await prisma.user.findUnique({
         where: {
-          username: username
+          username: username,
           // email: email
         },
       });
@@ -44,11 +52,21 @@ export async function PUT(request: NextRequest) {
       where: { id: session.user.id },
       data: {
         username,
-        bio,
-        socialLinks: socialLinks
-          ? JSON.parse(JSON.stringify(socialLinks))
-          : null, // Ensure valid JSON
+        bio: bio || null,
+        socialLinks: socialLinks || null,
+        interests: interests || [],
+        skills: skills || [],
         image: profileImage,
+        location: location || null, // Add location field
+      },
+      select: {
+        id: true,
+        username: true,
+        bio: true,
+        socialLinks: true,
+        interests: true,
+        skills: true,
+        location: true, // Include location in the response
       },
     });
 
@@ -81,6 +99,7 @@ export async function GET() {
       email: true,
       name: true,
       image: true,
+      location: true, // Include location in the GET response
     },
   });
 

@@ -28,8 +28,12 @@ model User {
   events           Event[]
   comments         Comment[]
   username         String?
+  displayUsername  String?
+  location         String?
   socialLinks      Json?
   bio              String?
+  interests        String[]
+  skills           String[]
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   following        Follow[]  @relation("FollowsAsFollower")

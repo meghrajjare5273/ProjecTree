@@ -106,9 +106,9 @@ export default function CompleteProfilePage() {
           },
           firstName,
           lastName,
-          location: "",
-          skills: [],
-          interests: [],
+          location: user.location || "",
+          skills: user.skills || [],
+          interests: user.interests || [],
           profilePhoto: user.image || "",
         });
 
@@ -119,6 +119,8 @@ export default function CompleteProfilePage() {
           bio: user.bio || "",
           image: user.image || null,
           socialLinks: user.socialLinks || null,
+          skills: user.skills || [],
+          interests: user.interests || [],
         });
       }
       setLoading(false);
@@ -187,24 +189,42 @@ export default function CompleteProfilePage() {
 
       // Prepare data for API
       const socialLinks = {
-        github: userData.socialLinks?.github || null,
-        linkedin: userData.socialLinks?.linkedin || null,
-        twitter: userData.socialLinks?.twitter || null,
-        website: userData.socialLinks?.website || null,
+        github: userData.socialLinks?.github || "",
+        linkedin: userData.socialLinks?.linkedin || "",
+        twitter: userData.socialLinks?.twitter || "",
+        website: userData.socialLinks?.website || "",
       };
+
+      // Filter out empty values from socialLinks
+      Object.keys(socialLinks).forEach((key) => {
+        if (socialLinks[key as keyof typeof socialLinks] === "") {
+          delete socialLinks[key as keyof typeof socialLinks];
+        }
+      });
 
       // Combine first and last name
       const name = `${userData.firstName} ${userData.lastName}`.trim();
+
+      // Filter out empty or null values from interests and skills
+      const filteredInterests = userData.interests.filter(
+        (interest) => interest && interest.trim() !== ""
+      );
+      const filteredSkills = userData.skills.filter(
+        (skill) => skill && skill.trim() !== ""
+      );
 
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: userData.username,
-          name,
-          bio: userData.bio,
-          socialLinks,
-          profileImage: userData.profilePhoto,
+          name: name || null,
+          bio: userData.bio || null,
+          socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : null,
+          profileImage: userData.profilePhoto || null,
+          skills: filteredSkills.length > 0 ? filteredSkills : [],
+          interests: filteredInterests.length > 0 ? filteredInterests : [],
+          location: userData.location || null,
         }),
         credentials: "include",
       });

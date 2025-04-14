@@ -38,16 +38,57 @@ export default function BiographyStep({
     const { name, value } = e.target;
 
     if (name === "bio") {
-      updateUserData({ bio: value });
+      updateUserData({ bio: value.trim() ? value : null });
     } else if (name.startsWith("social.")) {
       const socialKey = name.split(".")[1];
-      updateUserData({
-        socialLinks: {
-          ...userData.socialLinks,
-          [socialKey]: value,
-        },
-      });
+
+      // Create a new socialLinks object, properly handling null/undefined
+      const updatedSocialLinks = userData.socialLinks
+        ? { ...userData.socialLinks }
+        : {};
+
+      if (value.trim()) {
+        // Add prefix based on social platform if user doesn't include it
+        let fullUrl = value;
+        if (!value.startsWith("http")) {
+          switch (socialKey) {
+            case "website":
+              fullUrl = `https://${value}`;
+              break;
+            case "github":
+              fullUrl = `https://github.com/${value}`;
+              break;
+            case "twitter":
+              fullUrl = `https://twitter.com/${value}`;
+              break;
+            case "linkedin":
+              fullUrl = `https://www.linkedin.com/in/${value}`;
+              break;
+            default:
+              fullUrl = value;
+          }
+        }
+
+        // Set the value only if there's content
+        updatedSocialLinks[socialKey] = fullUrl;
+      } else {
+        // Remove the key if it exists and is now empty
+        if (socialKey in updatedSocialLinks) {
+          delete updatedSocialLinks[socialKey];
+        }
+      }
+
+      updateUserData({ socialLinks: updatedSocialLinks });
     }
+  };
+
+  // Extract usernames from full URLs for display
+  const extractUsername = (url: string | undefined, prefix: string): string => {
+    if (!url) return "";
+    if (url.startsWith(prefix)) {
+      return url.substring(prefix.length);
+    }
+    return url;
   };
 
   // Generate AI bio
@@ -140,7 +181,7 @@ export default function BiographyStep({
             <input
               id="social.website"
               name="social.website"
-              value={userData.socialLinks?.website || ""}
+              value={extractUsername(userData.socialLinks?.website, "https://")}
               onChange={handleInputChange}
               placeholder="yourwebsite.com"
               className="w-full bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 h-10 rounded-md pl-[4.5rem] pr-3 transition-all duration-200 focus:ring-2 focus:ring-yellow-400/50 focus:outline-none"
@@ -162,7 +203,10 @@ export default function BiographyStep({
               <input
                 id="social.github"
                 name="social.github"
-                value={userData.socialLinks?.github || ""}
+                value={extractUsername(
+                  userData.socialLinks?.github,
+                  "https://github.com/"
+                )}
                 onChange={handleInputChange}
                 placeholder="username"
                 className="w-full bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 h-10 rounded-md pl-[6.5rem] pr-3 transition-all duration-200 focus:ring-2 focus:ring-yellow-400/50 focus:outline-none"
@@ -181,7 +225,10 @@ export default function BiographyStep({
               <input
                 id="social.twitter"
                 name="social.twitter"
-                value={userData.socialLinks?.twitter || ""}
+                value={extractUsername(
+                  userData.socialLinks?.twitter,
+                  "https://twitter.com/"
+                )}
                 onChange={handleInputChange}
                 placeholder="username"
                 className="w-full bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 h-10 rounded-md pl-[6.5rem] pr-3 transition-all duration-200 focus:ring-2 focus:ring-yellow-400/50 focus:outline-none"
@@ -200,7 +247,10 @@ export default function BiographyStep({
               <input
                 id="social.linkedin"
                 name="social.linkedin"
-                value={userData.socialLinks?.linkedin || ""}
+                value={extractUsername(
+                  userData.socialLinks?.linkedin,
+                  "https://www.linkedin.com/in/"
+                )}
                 onChange={handleInputChange}
                 placeholder="username"
                 className="w-full bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 h-10 rounded-md pl-[8.5rem] pr-3 transition-all duration-200 focus:ring-2 focus:ring-yellow-400/50 focus:outline-none"
