@@ -1,11 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 
 // Fetch all events (GET)
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Get query parameters for pagination and filtering
+    const { searchParams } = new URL(request.url);
+    const limit = Number.parseInt(searchParams.get("limit") || "20");
+    const page = Number.parseInt(searchParams.get("page") || "1");
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination
+    const totalCount = await prisma.event.count();
+
+    // Fetch events with pagination
     const events = await prisma.event.findMany({
       include: {
         user: {
@@ -18,10 +28,21 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
+      take: limit,
+      skip: skip,
     });
 
+    // Set cache headers for better performance
     return NextResponse.json(
-      { data: events },
+      {
+        data: events,
+        pagination: {
+          total: totalCount,
+          page,
+          limit,
+          pages: Math.ceil(totalCount / limit),
+        },
+      },
       {
         status: 200,
         headers: {
@@ -65,7 +86,7 @@ export async function POST(request: NextRequest) {
         date: new Date(date),
         location: location || null,
         organizer: organizer || null,
-        images: images || [], // Add this line to handle image URLs
+        images: images || [],
         userId: session.user.id,
       },
       include: {

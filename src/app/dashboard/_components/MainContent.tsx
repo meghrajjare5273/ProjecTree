@@ -144,7 +144,7 @@ export default function MainContent({
       {/* Content */}
       {isLoading ? (
         <div className="space-y-6">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3].map((i) => (
             <Card
               key={i}
               className="bg-[#1a1a1a] border-[#333333] overflow-hidden"
@@ -205,7 +205,7 @@ export default function MainContent({
         </Card>
       ) : (
         <div className="space-y-6">
-          {filteredPosts.map((post: Post) => (
+          {filteredPosts.slice(0, 10).map((post: Post) => (
             <Card
               key={post.id}
               className="bg-[#1a1a1a] border-[#333333] overflow-hidden hover:border-[#444444] transition-colors"
@@ -223,6 +223,8 @@ export default function MainContent({
                           alt={post.user.username}
                           fill
                           className="object-cover"
+                          sizes="40px"
+                          loading="lazy"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-[#333333] text-white">
@@ -282,17 +284,21 @@ export default function MainContent({
                 {(post.images?.length > 0 || post.images) && (
                   <div className="relative h-64 w-full rounded-lg overflow-hidden mb-4">
                     <Image
-                      src={getPostImage(post)}
+                      src={getPostImage(post) || "/placeholder.svg"}
                       alt={post.title}
                       fill
                       className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 768px"
+                      loading="lazy"
+                      placeholder="blur"
+                      blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAEtAJJXIDTjwAAAABJRU5ErkJggg=="
                     />
                   </div>
                 )}
 
                 {post.tags && post.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {post.tags.map((tag, index) => (
+                    {post.tags.slice(0, 3).map((tag, index) => (
                       <Badge
                         key={index}
                         className="bg-[#252525] text-gray-300 hover:bg-[#333333]"
@@ -300,6 +306,11 @@ export default function MainContent({
                         #{tag}
                       </Badge>
                     ))}
+                    {post.tags.length > 3 && (
+                      <Badge className="bg-[#252525] text-gray-300 hover:bg-[#333333]">
+                        +{post.tags.length - 3}
+                      </Badge>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -349,6 +360,17 @@ export default function MainContent({
               </CardFooter>
             </Card>
           ))}
+
+          {filteredPosts.length > 10 && (
+            <div className="flex justify-center mt-4">
+              <Button
+                variant="outline"
+                className="border-[#333333] text-[#ffcc00] hover:bg-[#252525]"
+              >
+                Load More
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
