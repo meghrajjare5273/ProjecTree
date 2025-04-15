@@ -59,6 +59,7 @@ export type Project = {
   comments: Comment[];
   createdAt: Date;
   updatedAt: Date;
+  openForCollaboration: boolean;
   type: "project";
 };
 
