@@ -42,7 +42,7 @@
 
 | Category | Technologies |
 |----------|-------------|
-| **Framework** | Next.js 15.2.0 |
+| **Framework** | Next.js 15.3.0 |
 | **Language** | TypeScript |
 | **Database** | PostgreSQL with Prisma 6.4.1 |
 | **Authentication** | Better Auth (GitHub & Google) |
