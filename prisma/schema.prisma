@@ -60,16 +60,17 @@ model Comment {
 }
 
 model Project {
-  id          String    @id @default(cuid())
-  title       String
-  description String
-  images      String[] // Array of image URLs
-  tags        String[] // e.g., ["web", "AI", "hackathon"]
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments    Comment[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  title                String
+  description          String
+  images               String[] // Array of image URLs
+  tags                 String[] // e.g., ["web", "AI", "hackathon"]
+  userId               String
+  openForCollaboration Boolean   @default(false)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments             Comment[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([userId, id, createdAt])
   @@map("project")

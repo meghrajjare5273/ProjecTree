@@ -41,6 +41,11 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
         {project.title}
       </Typography>
 
+      {/* <h1>{project.title}</h1> */}
+      {project.openForCollaboration && (
+        <span className="badge badge-success">Open for Collaboration</span>
+      )}
+
       {project.tags && project.tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {project.tags.map((tag, index) => (

@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { title, description, images, tags } = await request.json();
+    const { title, description, images, tags, openForCollaboration } =
+      await request.json();
 
     if (!title || !description) {
       return NextResponse.json(
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
       data: {
         title,
         description,
+        openForCollaboration: openForCollaboration || false,
         images: images || [],
         tags: tags || [],
         userId: session.user.id,

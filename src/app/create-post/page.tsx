@@ -50,6 +50,7 @@ const projectSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   tags: z.string().optional(),
+  openForCollaboration: z.boolean(),
 });
 
 const eventSchema = z.object({
@@ -99,6 +100,7 @@ export default function CreatePost() {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<UserType | null>(null);
+  const [openForCollaboration, setOpenForCollaboration] = useState(false);
 
   // Fetch user data
   useEffect(() => {
@@ -121,6 +123,7 @@ export default function CreatePost() {
       title: "",
       description: "",
       tags: "",
+      openForCollaboration: false,
     },
   });
 
@@ -427,6 +430,17 @@ export default function CreatePost() {
                         <p className="text-gray-500 text-sm">
                           Supports JPG, PNG, GIF (max 5MB each)
                         </p>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={openForCollaboration}
+                          onChange={(e) =>
+                            setOpenForCollaboration(e.target.checked)
+                          }
+                          className="form-checkbox"
+                        />
+                        Open for Collaboration
                       </label>
                     </div>
 
