@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 export async function GET() {
   try {
     const projects = await prisma.project.findMany({
+      take: 5,
       include: {
         user: {
           select: {
