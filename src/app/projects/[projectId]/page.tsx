@@ -27,7 +27,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${project.title} - ProjecTree`,
+    title: `${project.title}`,
     description: project.description.substring(0, 160),
     openGraph: {
       title: project.title,

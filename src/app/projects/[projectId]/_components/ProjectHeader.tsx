@@ -41,9 +41,10 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
         {project.title}
       </Typography>
 
-      {/* <h1>{project.title}</h1> */}
       {project.openForCollaboration && (
-        <span className="badge badge-success">Open for Collaboration</span>
+        <Badge className="w-fit bg-green-500 text-white hover:bg-green-600">
+          Open for Collaboration
+        </Badge>
       )}
 
       {project.tags && project.tags.length > 0 && (
@@ -68,13 +69,13 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
             <Image
               src={
                 (project.user.image as string) ||
-                "/placeholder.svg?height=32&width=32"
+                "/placeholder.svg?height=32&width=32" ||
+                "/placeholder.svg"
               }
               alt={project.user.username || "User"}
               fill
               priority
             />
-            {/* {console.log(project.user.image)} */}
             <AvatarFallback>
               {project.user.username?.charAt(0).toUpperCase() || "U"}
             </AvatarFallback>
