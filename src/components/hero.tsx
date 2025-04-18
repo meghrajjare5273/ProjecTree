@@ -69,12 +69,12 @@ export default function HeroSection() {
           variants={imageVariants}
         >
           <Image
-            src="/pexels-buro-millennial-636760-1438072.jpg"
+            src="/pexels-buro-millennial-636760-1438072.webp"
             alt="Educational concept"
             fill
             className="object-cover"
             priority
-            // loading="lazy"
+            loading="eager"
             quality={75}
           />
         </motion.div>
