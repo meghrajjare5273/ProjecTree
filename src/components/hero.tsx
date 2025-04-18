@@ -99,14 +99,11 @@ export default function HeroSection() {
               </motion.p>
 
               {/* Main Heading */}
-              <motion.h1
-                variants={fadeIn}
-                className="text-5xl md:text-7xl font-bold text-white leading-tight"
-              >
+              <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight animate-fadeIn">
                 Where <span className="text-yellow-400">innovation</span>
                 <br />
                 blooms <span className="text-yellow-400">alive.</span>
-              </motion.h1>
+              </h1>
 
               {/* CTA Buttons */}
               <motion.div
