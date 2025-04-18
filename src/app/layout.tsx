@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { constructMetadata } from "@/lib/seo";
 import "./globals.css";
 import { Inter, Poppins, Playfair_Display } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 
 // Load Inter font with more weights for better typography
 const inter = Inter({
@@ -62,6 +63,7 @@ export default function RootLayout({
       >
         {children}
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
