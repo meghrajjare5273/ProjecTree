@@ -3,16 +3,17 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { constructMetadata } from "@/lib/seo";
 import "./globals.css";
-import { Inter, Poppins, Playfair_Display } from "next/font/google";
+import { Poppins, Playfair_Display } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
+import { preconnect } from "react-dom";
 
-// Load Inter font with more weights for better typography
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
-  variable: "--font-inter",
-});
+// // Load Inter font with more weights for better typography
+// const inter = Inter({
+//   subsets: ["latin"],
+//   display: "swap",
+//   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+//   variable: "--font-inter",
+// });
 
 // Add Poppins as a modern alternative
 const poppins = Poppins({
@@ -37,11 +38,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  preconnect("/api/auth");
   return (
     <html lang="en">
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />
+        {/* <link
+          rel="preload"
+          as="image"
+          href="/pexels-buro-millennial-636760-1438072.webp"
+        /> */}
+        {/* <link rel="preconnect" as="" href="/api/auth" /> */}
         <meta name="theme-color" content="#000000" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 
@@ -50,7 +58,7 @@ export default function RootLayout({
         <link
           rel="preload"
           as="image"
-          href="/pexels-buro-millennial-636760-1438072.jpg"
+          href="/pexels-buro-millennial-636760-1438072.webp"
         />
         <link
           rel="preconnect"
@@ -59,7 +67,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${poppins.variable} ${playfair.variable} font-poppins antialiased`}
+        className={`${poppins.variable} ${playfair.variable} font-poppins antialiased`}
       >
         {children}
         <SpeedInsights />
