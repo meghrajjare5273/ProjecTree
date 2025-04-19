@@ -19,16 +19,18 @@ import { preconnect } from "react-dom";
 const poppins = Poppins({
   subsets: ["latin"],
   display: "swap",
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  weight: ["100", "200", "300", "400", "500", "600"],
   variable: "--font-poppins",
+  preload: true,
 });
 
 // Add Playfair Display for elegant headings
 const playfair = Playfair_Display({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-playfair",
+  preload: true,
 });
 
 export const metadata: Metadata = constructMetadata({});
@@ -38,7 +40,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  preconnect("/api/auth");
+  preconnect("/api/auth/[..all]");
   return (
     <html lang="en">
       <head>

@@ -131,6 +131,12 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
   /* Custom font classes */
   .font-poppins {
     font-family: var(--font-poppins), system-ui, sans-serif;
