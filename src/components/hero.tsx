@@ -73,7 +73,7 @@ export default function HeroSection() {
             alt="Educational concept"
             fill
             className="object-cover"
-            sizes="(max-width: 2160px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            sizes="(max-width:2160px) 100vw, (max-width: 1200px) 50vw, 33vw"
             priority
             loading="eager"
             quality={75}
