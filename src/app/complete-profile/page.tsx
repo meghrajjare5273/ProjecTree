@@ -10,13 +10,13 @@ import { authClient } from "@/lib/auth-client";
 import { motion, AnimatePresence } from "motion/react";
 
 // Import components
-import BiographyStep from "./_components/biography-step";
-import InterestsStep from "./_components/interests-step";
-import PersonalInfoStep from "./_components/personal-info-step";
-import ProfileCompletionCard from "./_components/profile-completion-card";
-import ProfilePhotoStep from "./_components/profile-photo-step";
-import SkillsStep from "./_components/skills-step";
-import StepIndicator from "./_components/step-indicator";
+import BiographyStep from "./_components/BiographyStep";
+import InterestsStep from "./_components/InterestsStep";
+import PersonalInfoStep from "./_components/PersonalInfoStep";
+import ProfileCompletionCard from "./_components/ProfileCompletionCard";
+import ProfilePhotoStep from "./_components/ProfilePhotoStep";
+import SkillsStep from "./_components/SkillsStep";
+import StepIndicator from "./_components/StepIndicator";
 
 // UI Components
 import { Button } from "@/components/ui/button";
