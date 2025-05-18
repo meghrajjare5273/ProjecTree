@@ -1,0 +1,14 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /private
+Disallow: /api
+Disallow: /complete-profile
+Disallow: /create-post
+
+# Host
+Host: https://projectree-blush.vercel.app
+
+# Sitemaps
+Sitemap: https://projectree-blush.vercel.app/sitemap.xml

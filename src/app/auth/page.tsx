@@ -4,7 +4,6 @@ import { Suspense, useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
-
 import dynamic from "next/dynamic";
 const SignIn = dynamic(() => import("@/components/signin"), { ssr: false });
 const SignUp = dynamic(() => import("@/components/signup"), { ssr: false });
@@ -38,8 +37,12 @@ function AuthContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(() => {
-    const mode = searchParams.get("mode");
-    return mode === "signin" || mode === "signup" ? mode : "signup";
+    if (searchParams) {
+      const mode = searchParams.get("mode");
+      return mode === "signin" || mode === "signup" ? mode : "signup";
+    } else {
+      return "signin";
+    }
   });
   const [isLoading, setIsLoading] = useState(true);
 
