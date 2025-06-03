@@ -183,7 +183,7 @@ function Messaging({
 }
 
 // Example usage component for testing
-export function MessagingPage() {
+export default function MessagingPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   return (
