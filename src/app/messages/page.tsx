@@ -5,22 +5,6 @@ import { useState, useEffect, useRef } from "react";
 import { useMessages } from "@/hooks/use-socket";
 import { authClient } from "@/lib/auth-client";
 
-export interface Message {
-  id: string;
-  senderId: string;
-  receiverId: string;
-  content: string;
-  createdAt: Date | string;
-  read: boolean;
-  sending?: boolean;
-  tempId?: string;
-  sender?: {
-    id: string;
-    name: string;
-    image?: string;
-  };
-}
-
 interface MessagingProps {
   receiverId: string;
   receiverName?: string;
@@ -143,10 +127,16 @@ export default function Messaging({
                       isOwnMessage ? "text-blue-100" : "text-gray-500"
                     }`}
                   >
-                    {new Date(msg.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {(() => {
+                      try {
+                        return new Date(msg.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                      } catch {
+                        return "Invalid time";
+                      }
+                    })()}
                     {msg.sending && " • Sending..."}
                   </div>
                 </div>

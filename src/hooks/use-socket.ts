@@ -75,9 +75,10 @@ export function useMessages(receiverId?: string) {
 
     // Listen for message sent confirmation
     socket.on("messageSent", (message) => {
-      // Message is already added optimistically, just update status if needed
       setMessages((prev) =>
-        prev.map((msg) => (msg.tempId === message.tempId ? message : msg))
+        prev.map((msg) =>
+          msg.tempId && msg.tempId === message.tempId ? message : msg
+        )
       );
     });
 
