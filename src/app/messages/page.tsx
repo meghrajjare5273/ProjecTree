@@ -10,7 +10,7 @@ interface MessagingProps {
   receiverName?: string;
 }
 
-export default function Messaging({
+function Messaging({
   receiverId,
   receiverName,
 }: MessagingProps) {
