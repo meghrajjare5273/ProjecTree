@@ -77,7 +77,7 @@ export function useMessages(receiverId?: string) {
     socket.on("messageSent", (message) => {
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.tempId && msg.tempId === message.tempId ? message : msg
+          msg.id === message.id || msg.tempId === message.tempId ? message : msg
         )
       );
     });

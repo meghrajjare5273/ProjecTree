@@ -15,8 +15,24 @@ export async function GET(req: NextRequest) {
 
     const url = new URL(req.url);
     const otherUserId = url.searchParams.get("userId");
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const pageParam = url.searchParams.get("page");
+    const limitParam = url.searchParams.get("limit");
+
+    const page = Number(pageParam ?? 1);
+    const limit = Number(limitParam ?? 50);
+
+    if (
+      !Number.isFinite(page) ||
+      page < 1 ||
+      !Number.isFinite(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      return NextResponse.json(
+        { error: "Invalid pagination parameters" },
+        { status: 400 }
+      );
+    }
 
     if (!otherUserId) {
       return NextResponse.json(
@@ -80,4 +96,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

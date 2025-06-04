@@ -10,10 +10,7 @@ interface MessagingProps {
   receiverName?: string;
 }
 
-function Messaging({
-  receiverId,
-  receiverName,
-}: MessagingProps) {
+function Messaging({ receiverId, receiverName }: MessagingProps) {
   const { data: session } = authClient.useSession();
   const { messages, sendMessage, sendTyping, typingUsers, isConnected } =
     useMessages(receiverId);
@@ -30,23 +27,30 @@ function Messaging({
 
   // Handle typing indicators
   useEffect(() => {
-    if (content.trim() && !isCurrentlyTyping) {
-      setIsCurrentlyTyping(true);
-      sendTyping(true);
-    }
+    if (content.trim()) {
+      if (!isCurrentlyTyping) {
+        setIsCurrentlyTyping(true);
+        sendTyping(true);
+      }
 
-    // Clear existing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
 
-    // Set new timeout to stop typing indicator
-    typingTimeoutRef.current = setTimeout(() => {
-      if (isCurrentlyTyping) {
+      // Set new timeout to stop typing indicator
+      typingTimeoutRef.current = setTimeout(() => {
         setIsCurrentlyTyping(false);
         sendTyping(false);
+      }, 1000);
+    } else if (isCurrentlyTyping) {
+      // Immediately stop typing when content is empty
+      setIsCurrentlyTyping(false);
+      sendTyping(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
       }
-    }, 1000);
+    }
 
     return () => {
       if (typingTimeoutRef.current) {
@@ -59,8 +63,13 @@ function Messaging({
     if (!content.trim()) return;
 
     const tempId = `temp-${Date.now()}`;
-    sendMessage(content, tempId);
-    setContent("");
+    try {
+      sendMessage(content, tempId);
+      setContent("");
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      // Consider adding toast notification or error state
+    }
 
     // Stop typing indicator
     if (isCurrentlyTyping) {
@@ -165,11 +174,15 @@ function Messaging({
             onChange={(e) => setContent(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
+            aria-label="Message input"
+            aria-describedby="send-button"
             className="flex-1 border rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={1}
             disabled={!isConnected}
           />
           <button
+            id="send-button"
+            aria-label="Send message"
             onClick={handleSendMessage}
             disabled={!content.trim() || !isConnected}
             className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
