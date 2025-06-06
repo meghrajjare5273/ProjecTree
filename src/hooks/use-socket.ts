@@ -60,7 +60,7 @@ interface UseWebSocketReturn {
 }
 
 export const useWebSocket = ({
-  serverUrl = process.env.NEXT_PUBLIC_WS_SERVER_URL || "http://localhost:3001",
+  serverUrl = process.env.NEXT_PUBLIC_WS_SERVER_URL || "ws://localhost:3001",
   autoConnect = true,
 }: UseWebSocketOptions = {}): UseWebSocketReturn => {
   const socketRef = useRef<Socket | null>(null);
@@ -108,6 +108,10 @@ export const useWebSocket = ({
       auth: { sessionId: sessionToken },
       query: { sessionId: sessionToken },
       extraHeaders: { Cookie: document.cookie },
+      timeout: 20000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     socket.on("connect", () => {
@@ -115,6 +119,13 @@ export const useWebSocket = ({
       setIsConnected(true);
       setIsConnecting(false);
       setError(null);
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("Connection error:", err);
+      setError(err.message || "Connection failed");
+      setIsConnected(false);
+      setIsConnecting(false);
     });
 
     socket.on("connection:success", (data: { userId: string }) => {
