@@ -1,392 +1,343 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 
-interface User {
-  id: string;
-  name: string;
-  image?: string;
-}
-
-interface Message {
+export interface Message {
   id: string;
   content: string;
   senderId: string;
   receiverId: string;
   createdAt: string;
   read: boolean;
-  sender: User;
-  receiver: User;
+  sender: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    image: string | null;
+  };
 }
 
-interface Conversation {
-  user: User;
-  lastMessage: Message;
-  unreadCount: number;
-  isOnline: boolean;
+export interface Conversation {
+  id: string;
+  other_user_id: string;
+  content: string;
+  createdAt: string;
+  name: string | null;
+  username: string | null;
+  image: string | null;
+  user_id: string;
+  unread_count: number;
 }
 
-interface UseWebSocketOptions {
+export interface TypingUser {
+  userId: string;
+  isTyping: boolean;
+}
+
+interface UseChatOptions {
   serverUrl?: string;
   autoConnect?: boolean;
 }
 
-interface UseWebSocketReturn {
-  socket: Socket | null;
-  isConnected: boolean;
-  isConnecting: boolean;
-  error: string | null;
-  currentUserId: string | null;
-  sendMessage: (
-    receiverId: string,
-    content: string
-  ) => Promise<{ success: boolean; message?: Message; error?: string }>;
-  markMessagesAsRead: (messageIds: string[]) => void;
-  startTyping: (receiverId: string) => void;
-  stopTyping: (receiverId: string) => void;
-  getConversationHistory: (
-    userId: string,
-    page?: number,
-    limit?: number
-  ) => void;
-  getConversations: () => void;
-  conversations: Conversation[];
-  messages: Record<string, Message[]>;
-  onlineUsers: Set<string>;
-  typingUsers: Record<string, User>;
-  connect: () => void;
-  disconnect: () => void;
-}
+export const useChat = (options: UseChatOptions = {}) => {
+  const {
+    serverUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL ||
+      "http://localhost:3001",
+    autoConnect = true,
+  } = options;
 
-export const useWebSocket = ({
-  serverUrl = process.env.NEXT_PUBLIC_WS_SERVER_URL || "ws://localhost:3001",
-  autoConnect = true,
-}: UseWebSocketOptions = {}): UseWebSocketReturn => {
-  const socketRef = useRef<Socket | null>(null);
+  const [, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Record<string, Message[]>>({});
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [typingUsers, setTypingUsers] = useState<Record<string, User>>({});
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [currentChatUser, setCurrentChatUser] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const getSessionToken = useCallback(() => {
-    if (typeof document === "undefined") return null;
-    const cookies = document.cookie.split(";").reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split("=");
-      acc[key] = value;
-      console.log(acc);
-      return acc;
-    }, {} as Record<string, string>);
-    return (
-      cookies["better-auth.session_token"] ||
-      cookies["session"] ||
-      cookies["sessionId"] ||
-      cookies["__Secure-better-auth.session_token"]
-    );
-  }, []);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
 
-  const connect = useCallback(() => {
-    if (socketRef.current?.connected) return;
+  // Setup event listeners for socket
+  const setupSocketListeners = useCallback((socketInstance: Socket) => {
+    console.log("Setting up socket listeners...");
 
-    setIsConnecting(true);
-    setError(null);
+    // Remove existing listeners to prevent duplicates
+    socketInstance.removeAllListeners();
 
-    const sessionToken = getSessionToken();
-    if (!sessionToken) {
-      setError("No authentication token found");
-      setIsConnecting(false);
-      return;
-    }
-
-    const socket = io(serverUrl, {
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-      auth: { sessionId: sessionToken },
-      query: { sessionId: sessionToken },
-      extraHeaders: { Cookie: document.cookie },
-      timeout: 20000,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
-    socket.on("connect", () => {
-      console.log("Connected to WebSocket server");
+    socketInstance.on("connect", () => {
+      console.log("✅ Connected to chat server");
       setIsConnected(true);
-      setIsConnecting(false);
       setError(null);
     });
 
-    socket.on("connect_error", (err) => {
-      console.error("Connection error:", err);
-      setError(err.message || "Connection failed");
+    socketInstance.on("disconnect", (reason) => {
+      console.log("❌ Disconnected from chat server:", reason);
       setIsConnected(false);
-      setIsConnecting(false);
     });
 
-    socket.on("connection:success", (data: { userId: string }) => {
-      setCurrentUserId(data.userId);
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("Disconnected:", reason);
+    socketInstance.on("connect_error", (error) => {
+      console.error("❌ Connection error:", error);
+      setError("Failed to connect to chat server");
       setIsConnected(false);
-      setIsConnecting(false);
-      if (reason === "io server disconnect") setError("Disconnected by server");
     });
 
-    socket.on("connect_error", (err) => {
-      console.error("Connection error:", err);
-      setError(err.message || "Connection failed");
-      setIsConnected(false);
-      setIsConnecting(false);
-    });
-
-    socket.on("message:receive", (message: Message) => {
-      console.log("Message received:", message);
+    // Message event listeners
+    socketInstance.on("new_message", (message: Message) => {
+      console.log("📨 Received new message:", message);
       setMessages((prev) => {
-        const senderId = message.senderId;
-        const existing = prev[senderId] || [];
-        if (existing.some((msg) => msg.id === message.id)) return prev;
-        return {
-          ...prev,
-          [senderId]: [...existing, message].sort(
-            (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          ),
-        };
-      });
-      setConversations((prev) => {
-        const updated = prev.map((conv) =>
-          conv.user.id === message.senderId
-            ? {
-                ...conv,
-                lastMessage: message,
-                unreadCount: conv.unreadCount + 1,
-              }
-            : conv
-        );
-        if (!updated.some((conv) => conv.user.id === message.senderId)) {
-          updated.unshift({
-            user: message.sender,
-            lastMessage: message,
-            unreadCount: 1,
-            isOnline: onlineUsers.has(message.senderId),
-          });
-        }
-        return updated.sort(
-          (a, b) =>
-            new Date(b.lastMessage.createdAt).getTime() -
-            new Date(a.lastMessage.createdAt).getTime()
-        );
+        // Prevent duplicate messages
+        const exists = prev.some((msg) => msg.id === message.id);
+        if (exists) return prev;
+        return [...prev, message];
       });
     });
 
-    socket.on("message:sent", (message: Message) => {
-      console.log("Message sent:", message);
-      setMessages((prev) => {
-        const receiverId = message.receiverId;
-        const existing = prev[receiverId] || [];
-        if (existing.some((msg) => msg.id === message.id)) return prev;
-        return {
-          ...prev,
-          [receiverId]: [...existing, message].sort(
-            (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          ),
-        };
-      });
+    socketInstance.on("chat_history", (history: Message[]) => {
+      console.log("📜 Received chat history:", history.length, "messages");
+      setMessages(history);
+      setIsLoading(false);
     });
 
-    socket.on(
-      "message:read",
-      (data: { messageIds: string[]; readBy: string; readByUser: User }) => {
-        console.log("Messages read:", data);
-        setMessages((prev) => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach((userId) => {
-            updated[userId] = updated[userId].map((msg) =>
-              data.messageIds.includes(msg.id) ? { ...msg, read: true } : msg
-            );
-          });
-          return updated;
-        });
-      }
-    );
-
-    socket.on("typing:start", (data: { userId: string; user: User }) => {
-      setTypingUsers((prev) => ({ ...prev, [data.userId]: data.user }));
+    socketInstance.on("conversations", (convs: Conversation[]) => {
+      console.log("💬 Received conversations:", convs.length);
+      setConversations(convs);
     });
 
-    socket.on("typing:stop", (data: { userId: string }) => {
+    socketInstance.on("unread_count", (count: number) => {
+      console.log("📧 Unread count updated:", count);
+      setUnreadCount(count);
+    });
+
+    socketInstance.on("user_typing", ({ userId, isTyping }: TypingUser) => {
+      console.log("⌨️ Typing indicator:", userId, isTyping);
       setTypingUsers((prev) => {
-        const updated = { ...prev };
-        delete updated[data.userId];
-        return updated;
+        const newSet = new Set(prev);
+        if (isTyping) {
+          newSet.add(userId);
+        } else {
+          newSet.delete(userId);
+        }
+        return newSet;
       });
     });
 
-    socket.on("user:online", (data: { userId: string; user?: User }) => {
-      setOnlineUsers((prev) => new Set([...prev, data.userId]));
-      if (data.user) {
-        setConversations((prev) =>
-          prev.map((conv) =>
-            conv.user.id === data.userId ? { ...conv, isOnline: true } : conv
-          )
-        );
-      }
+    socketInstance.on("new_message_notification", (notification) => {
+      console.log("🔔 New message notification:", notification);
+      // You can handle notifications here (toast, etc.)
     });
 
-    socket.on("user:offline", (data: { userId: string }) => {
-      setOnlineUsers((prev) => {
-        const updated = new Set(prev);
-        updated.delete(data.userId);
-        return updated;
-      });
-      setConversations((prev) =>
-        prev.map((conv) =>
-          conv.user.id === data.userId ? { ...conv, isOnline: false } : conv
+    socketInstance.on("messages_read", ({ readBy }) => {
+      console.log("✅ Messages read by:", readBy);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.receiverId === readBy ? { ...msg, read: true } : msg
         )
       );
     });
 
-    socket.on("conversations:list", (conversationsList: Conversation[]) => {
-      console.log("Conversations:", conversationsList);
-      setConversations(conversationsList);
+    socketInstance.on("message_sent", ({ messageId, status }) => {
+      console.log("📤 Message sent:", messageId, status);
     });
 
-    socket.on(
-      "conversation:history",
-      (data: { messages: Message[]; hasMore: boolean; page: number }) => {
-        console.log("History received:", data);
-        if (data.messages.length > 0 && currentUserId) {
-          const firstMessage = data.messages[0];
-          const otherUserId =
-            firstMessage.senderId === currentUserId
-              ? firstMessage.receiverId
-              : firstMessage.senderId;
-          setMessages((prev) => {
-            const existing = prev[otherUserId] || [];
-            const newMessages = data.messages.filter(
-              (msg) => !existing.some((e) => e.id === msg.id)
-            );
-            return {
-              ...prev,
-              [otherUserId]: [...existing, ...newMessages].sort(
-                (a, b) =>
-                  new Date(a.createdAt).getTime() -
-                  new Date(b.createdAt).getTime()
-              ),
-            };
-          });
-        }
+    socketInstance.on("error", ({ message }) => {
+      console.error("❌ Socket error:", message);
+      setError(message);
+    });
+
+    console.log("✅ Socket listeners setup complete");
+  }, []);
+
+  // Initialize socket connection
+  useEffect(() => {
+    if (!autoConnect) return;
+
+    console.log("🔌 Initializing socket connection...");
+
+    const newSocket = io(serverUrl, {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+      forceNew: true, // Force a new connection
+    });
+
+    socketRef.current = newSocket;
+    setSocket(newSocket);
+    setupSocketListeners(newSocket);
+
+    return () => {
+      console.log("🧹 Cleaning up socket connection...");
+      if (newSocket) {
+        newSocket.removeAllListeners();
+        newSocket.close();
       }
-    );
+      socketRef.current = null;
+    };
+  }, [serverUrl, autoConnect, setupSocketListeners]);
 
-    socket.on("error", (errorMsg: string) => {
-      console.error("Server error:", errorMsg);
-      setError(errorMsg);
-    });
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
-    socketRef.current = socket;
-  }, [serverUrl, getSessionToken]);
+  // Connect manually
+  const connect = useCallback(() => {
+    if (socketRef.current && !socketRef.current.connected) {
+      socketRef.current.connect();
+    }
+  }, []);
 
+  // Disconnect manually
   const disconnect = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
-      socketRef.current = null;
-      setIsConnected(false);
-      setCurrentUserId(null);
     }
   }, []);
 
-  useEffect(() => {
-    if (autoConnect) connect();
-    return () => {
-      if (socketRef.current) disconnect();
-    };
-  }, [autoConnect, connect, disconnect]);
+  // Join a chat room
+  const joinChat = useCallback(
+    (otherUserId: string) => {
+      if (!socketRef.current || !isConnected) {
+        setError("Not connected to chat server");
+        return;
+      }
 
-  const sendMessage = useCallback(
-    (
-      receiverId: string,
-      content: string
-    ): Promise<{ success: boolean; message?: Message; error?: string }> => {
-      return new Promise((resolve) => {
-        if (!socketRef.current?.connected) {
-          resolve({ success: false, error: "Not connected" });
-          return;
-        }
-        socketRef.current.emit(
-          "message:send",
-          { receiverId, content },
-          (response: {
-            success: boolean;
-            message?: Message;
-            error?: string;
-          }) => {
-            resolve(response);
-          }
-        );
-      });
+      console.log("👥 Joining chat with:", otherUserId);
+      setIsLoading(true);
+      setCurrentChatUser(otherUserId);
+      setMessages([]);
+      socketRef.current.emit("join_chat", { otherUserId });
     },
-    []
+    [isConnected]
   );
 
-  const markMessagesAsRead = useCallback((messageIds: string[]) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("message:read", { messageIds });
-    }
-  }, []);
+  // Send a message
+  const sendMessage = useCallback(
+    (receiverId: string, content: string) => {
+      if (!socketRef.current || !isConnected) {
+        setError("Not connected to chat server");
+        return;
+      }
 
-  const startTyping = useCallback((receiverId: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("typing:start", { receiverId });
-    }
-  }, []);
+      if (!content.trim()) {
+        setError("Message cannot be empty");
+        return;
+      }
 
-  const stopTyping = useCallback((receiverId: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("typing:stop", { receiverId });
-    }
-  }, []);
+      console.log("📤 Sending message to:", receiverId);
+      socketRef.current.emit("send_message", { receiverId, content });
+      setError(null);
+    },
+    [isConnected]
+  );
 
-  const getConversationHistory = useCallback(
-    (userId: string, page = 1, limit = 50) => {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit("conversation:history", { userId, page, limit });
+  // Start typing indicator
+  const startTyping = useCallback(
+    (receiverId: string) => {
+      if (!socketRef.current || !isConnected) return;
+
+      socketRef.current.emit("typing_start", { receiverId });
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Stop typing after 3 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        stopTyping(receiverId);
+      }, 3000);
+    },
+    [isConnected]
+  );
+
+  // Stop typing indicator
+  const stopTyping = useCallback(
+    (receiverId: string) => {
+      if (!socketRef.current || !isConnected) return;
+
+      socketRef.current.emit("typing_stop", { receiverId });
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
       }
     },
-    []
+    [isConnected]
   );
 
-  const getConversations = useCallback(() => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("conversations:list");
+  // Mark messages as read
+  const markAsRead = useCallback(
+    (senderId: string) => {
+      if (!socketRef.current || !isConnected) return;
+
+      console.log("✅ Marking messages as read from:", senderId);
+      socketRef.current.emit("mark_read", { senderId });
+    },
+    [isConnected]
+  );
+
+  // Load conversations
+  const loadConversations = useCallback(() => {
+    if (!socketRef.current || !isConnected) return;
+
+    console.log("📋 Loading conversations...");
+    socketRef.current.emit("get_conversations");
+  }, [isConnected]);
+
+  // Get conversation by user ID
+  const getConversationByUserId = useCallback(
+    (userId: string) => {
+      return conversations.find((conv) => conv.other_user_id === userId);
+    },
+    [conversations]
+  );
+
+  // Leave current chat
+  const leaveChat = useCallback(() => {
+    setCurrentChatUser(null);
+    setMessages([]);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
+  }, []);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
   return {
-    socket: socketRef.current,
+    // Connection state
     isConnected,
-    isConnecting,
+    isLoading,
     error,
-    currentUserId,
-    sendMessage,
-    markMessagesAsRead,
-    startTyping,
-    stopTyping,
-    getConversationHistory,
-    getConversations,
-    conversations,
+
+    // Data
     messages,
-    onlineUsers,
+    conversations,
+    unreadCount,
+    currentChatUser,
+    setCurrentChatUser,
     typingUsers,
+
+    // Actions
     connect,
     disconnect,
+    joinChat,
+    leaveChat,
+    sendMessage,
+    startTyping,
+    stopTyping,
+    markAsRead,
+    loadConversations,
+    clearError,
+
+    // Utilities
+    getConversationByUserId,
+    messagesEndRef,
   };
 };
