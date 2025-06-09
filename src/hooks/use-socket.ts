@@ -1,3 +1,4 @@
+"use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 
@@ -45,7 +46,8 @@ export const useChat = (options: UseChatOptions = {}) => {
     autoConnect = true,
   } = options;
 
-  const [, setSocket] = useState<Socket | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);

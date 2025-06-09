@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useChat } from "@/hooks/use-socket"; // Adjust import path
 import { formatDistanceToNow } from "date-fns";
 
@@ -41,10 +41,10 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
   } = useChat();
 
   const [messageInput, setMessageInput] = useState("");
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSelectingUser, setIsSelectingUser] = useState(false);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -56,20 +56,28 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       conversationsCount: conversations.length,
       currentChatUser,
       unreadCount,
+      isSelectingUser,
     });
-  }, [isConnected, messages, conversations, currentChatUser, unreadCount]);
+  }, [
+    isConnected,
+    messages,
+    conversations,
+    currentChatUser,
+    unreadCount,
+    isSelectingUser,
+  ]);
 
   // Load conversations when connected
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && !isLoading) {
       console.log("Connected - loading conversations...");
       loadConversations();
     }
-  }, [isConnected, loadConversations]);
+  }, [isConnected, isLoading, loadConversations]);
 
   // Handle typing indicators with improved debouncing
   useEffect(() => {
-    if (currentChatUser && messageInput.length > 0) {
+    if (currentChatUser && messageInput.length > 0 && isConnected) {
       startTyping(currentChatUser);
 
       // Clear existing timeout
@@ -97,7 +105,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
         clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [messageInput, currentChatUser, startTyping, stopTyping]);
+  }, [messageInput, currentChatUser, startTyping, stopTyping, isConnected]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -108,48 +116,81 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     };
   }, []);
 
-  // Search users function (you'll need to implement this API endpoint)
-  const searchUsers = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `/api/users/search?q=${encodeURIComponent(query)}`
-      );
-      if (response.ok) {
-        const users = await response.json();
-        setSearchResults(
-          users.filter((user: any) => user.id !== currentUser.id)
-        );
-      } else {
-        console.error("Failed to search users:", response.statusText);
+  // Search users function
+  const searchUsers = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        return;
       }
-    } catch (error) {
-      console.error("Error searching users:", error);
-    }
-  };
 
-  const handleUserSelect = (userId: string) => {
-    console.log("Selecting user:", userId);
-    setSelectedUser(userId);
-    setCurrentChatUser(userId);
-    joinChat(userId);
-    setShowUserSearch(false);
-    setSearchQuery("");
-    setSearchResults([]);
+      try {
+        const response = await fetch(
+          `/api/users/search?q=${encodeURIComponent(query)}`
+        );
+        if (response.ok) {
+          const users = await response.json();
+          setSearchResults(
+            users.filter((user: any) => user.id !== currentUser.id)
+          );
+        } else {
+          console.error("Failed to search users:", response.statusText);
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.error("Error searching users:", error);
+        setSearchResults([]);
+      }
+    },
+    [currentUser]
+  );
 
-    // Focus on message input after selecting user
-    setTimeout(() => {
-      messageInputRef.current?.focus();
-    }, 100);
-  };
+  const handleUserSelect = useCallback(
+    async (userId: string) => {
+      if (isSelectingUser || userId === currentChatUser) {
+        return; // Prevent multiple simultaneous selections or selecting the same user
+      }
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim() || !currentChatUser) {
-      console.warn("Cannot send message: empty input or no chat user");
+      console.log("Selecting user:", userId);
+      setIsSelectingUser(true);
+
+      try {
+        // Clear any existing chat first
+        if (currentChatUser) {
+          await leaveChat();
+        }
+
+        // Set the new chat user
+        setCurrentChatUser(userId);
+
+        // Join the new chat
+        await joinChat(userId);
+
+        // Close search and clear search state
+        setShowUserSearch(false);
+        setSearchQuery("");
+        setSearchResults([]);
+
+        // Focus on message input after selecting user
+        setTimeout(() => {
+          messageInputRef.current?.focus();
+        }, 200);
+      } catch (error) {
+        console.error("Error selecting user:", error);
+        // Reset state on error
+        setCurrentChatUser(null);
+      } finally {
+        setIsSelectingUser(false);
+      }
+    },
+    [isSelectingUser, currentChatUser, leaveChat, setCurrentChatUser, joinChat]
+  );
+
+  const handleSendMessage = useCallback(() => {
+    if (!messageInput.trim() || !currentChatUser || !isConnected) {
+      console.warn(
+        "Cannot send message: empty input, no chat user, or not connected"
+      );
       return;
     }
 
@@ -163,7 +204,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       typingTimeoutRef.current = null;
     }
     stopTyping(currentChatUser);
-  };
+  }, [messageInput, currentChatUser, isConnected, sendMessage, stopTyping]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -181,7 +222,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     }
   };
 
-  const getCurrentChatUserInfo = () => {
+  const getCurrentChatUserInfo = useCallback(() => {
     if (!currentChatUser) return null;
     const conversation = getConversationByUserId(currentChatUser);
     return conversation
@@ -192,13 +233,13 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           image: conversation.image,
         }
       : null;
-  };
+  }, [currentChatUser, getConversationByUserId]);
 
   const currentChatUserInfo = getCurrentChatUserInfo();
 
   // Handle marking messages as read when entering chat
   useEffect(() => {
-    if (currentChatUser && messages.length > 0) {
+    if (currentChatUser && messages.length > 0 && isConnected) {
       // Mark messages as read after a short delay
       const timer = setTimeout(() => {
         markAsRead(currentChatUser);
@@ -206,7 +247,15 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [currentChatUser, messages, markAsRead]);
+  }, [currentChatUser, messages.length, markAsRead, isConnected]);
+
+  // Handle leaving chat
+  const handleLeaveChat = useCallback(async () => {
+    if (currentChatUser) {
+      await leaveChat();
+      setCurrentChatUser(null);
+    }
+  }, [currentChatUser, leaveChat, setCurrentChatUser]);
 
   return (
     <div className={`flex h-full bg-white ${className}`}>
@@ -226,6 +275,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                 onClick={() => setShowUserSearch(!showUserSearch)}
                 className="p-2 hover:bg-gray-100 rounded-full"
                 title="Start new chat"
+                disabled={isSelectingUser}
               >
                 <svg
                   className="w-5 h-5"
@@ -254,6 +304,9 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             <span className="text-sm text-gray-600">
               {isConnected ? "Connected" : "Disconnected"}
             </span>
+            {isSelectingUser && (
+              <span className="text-xs text-blue-600 ml-2">Selecting...</span>
+            )}
             {/* Debug info in development */}
             {process.env.NODE_ENV === "development" && (
               <span className="text-xs text-gray-400 ml-2">
@@ -275,6 +328,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                 searchUsers(e.target.value);
               }}
               className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isSelectingUser}
             />
 
             {/* Search Results */}
@@ -283,8 +337,14 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                 {searchResults.map((user) => (
                   <div
                     key={user.id}
-                    onClick={() => handleUserSelect(user.id)}
-                    className="flex items-center p-2 hover:bg-gray-100 cursor-pointer rounded"
+                    onClick={() =>
+                      !isSelectingUser && handleUserSelect(user.id)
+                    }
+                    className={`flex items-center p-2 rounded cursor-pointer ${
+                      isSelectingUser
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-100"
+                    }`}
                   >
                     <img
                       src={user.image || "/default-avatar.png"}
@@ -307,11 +367,15 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           {conversations.map((conversation) => (
             <div
               key={conversation.other_user_id}
-              onClick={() => handleUserSelect(conversation.other_user_id)}
-              className={`flex items-center p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${
-                selectedUser === conversation.other_user_id
+              onClick={() =>
+                !isSelectingUser && handleUserSelect(conversation.other_user_id)
+              }
+              className={`flex items-center p-4 cursor-pointer border-b border-gray-100 ${
+                currentChatUser === conversation.other_user_id
                   ? "bg-blue-50 border-blue-200"
-                  : ""
+                  : isSelectingUser
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-gray-50"
               }`}
             >
               <div className="relative">
@@ -345,7 +409,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             </div>
           ))}
 
-          {conversations.length === 0 && isConnected && (
+          {conversations.length === 0 && isConnected && !isLoading && (
             <div className="p-8 text-center text-gray-500">
               <p>No conversations yet</p>
               <p className="text-sm mt-2">
@@ -354,9 +418,10 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             </div>
           )}
 
-          {!isConnected && (
+          {(!isConnected || isLoading) && (
             <div className="p-8 text-center text-gray-500">
-              <p>Connecting...</p>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p>{isLoading ? "Loading..." : "Connecting..."}</p>
             </div>
           )}
         </div>
@@ -371,11 +436,9 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <button
-                    onClick={() => {
-                      leaveChat();
-                      setSelectedUser(null);
-                    }}
+                    onClick={handleLeaveChat}
                     className="p-2 hover:bg-gray-100 rounded-full mr-3 md:hidden"
+                    disabled={isSelectingUser}
                   >
                     <svg
                       className="w-5 h-5"
@@ -418,6 +481,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                   onClick={() => markAsRead(currentChatUser)}
                   className="p-2 hover:bg-gray-100 rounded-full"
                   title="Mark as read"
+                  disabled={!isConnected}
                 >
                   <svg
                     className="w-5 h-5"
@@ -510,12 +574,14 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                   onKeyPress={handleKeyPress}
                   placeholder="Type a message..."
                   className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!isConnected}
+                  disabled={!isConnected || isSelectingUser}
                 />
 
                 <button
                   onClick={handleSendMessage}
-                  disabled={!messageInput.trim() || !isConnected}
+                  disabled={
+                    !messageInput.trim() || !isConnected || isSelectingUser
+                  }
                   className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg
@@ -537,7 +603,6 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           </>
         ) : (
           /* No Chat Selected */
-          /* No Chat Selected */
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <svg
@@ -554,10 +619,12 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                 />
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Select a conversation
+                {isSelectingUser ? "Loading chat..." : "Select a conversation"}
               </h3>
               <p className="text-gray-600">
-                Choose from your existing conversations or start a new one
+                {isSelectingUser
+                  ? "Please wait while we load your chat"
+                  : "Choose from your existing conversations or start a new one"}
               </p>
             </div>
           </div>

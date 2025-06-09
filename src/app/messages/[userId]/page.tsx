@@ -1,23 +1,30 @@
-import { prisma } from "@/lib/prisma";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
 import ChatComponent from "../_components/Chat";
+import { useEffect, useState } from "react";
+import { getUserData } from "../_utils";
 
-async function getUserData(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-  if (!user) {
-    throw new Error("User not found");
-  }
-  return user;
-}
-
-export default async function MessagesPage({
+export default function MessagesPage({
   params,
 }: {
   params: Promise<{ userId: string }>;
 }) {
-  const { userId } = await params;
-  const user = await getUserData(userId);
+  const [currUser, setCurrUser] = useState<any | null>(null);
 
-  return <ChatComponent currentUser={user} />;
+  useEffect(() => {
+    // Fetch the user data when the component mounts
+    const currentUser = async () => {
+      const { userId } = await params;
+      const user = await getUserData(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+      setCurrUser(user);
+    };
+    currentUser();
+  }, [params]);
+  // const { userId } =  params;
+  // const user = await getUserData(userId);
+
+  return <ChatComponent currentUser={currUser} />;
 }
