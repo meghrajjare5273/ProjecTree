@@ -8,9 +8,14 @@ import { formatDistanceToNow } from "date-fns";
 interface ChatComponentProps {
   currentUser: {
     id: string;
-    name: string | null;
-    username: string | null;
-    image: string | null;
+    name: string;
+    email: string;
+    emailVerified: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    image?: string | null | undefined | undefined;
+    username?: string | null | undefined;
+    displayUsername?: string | undefined;
   };
   className?: string;
 }
@@ -39,7 +44,10 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     clearError,
     getConversationByUserId,
     messagesEndRef,
-  } = useChat();
+  } = useChat({
+    currentUserId: currentUser.id, // Pass the current user ID
+    autoConnect: true,
+  });
 
   // Component state
   const [messageInput, setMessageInput] = useState("");
@@ -60,7 +68,11 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
   useEffect(() => {
     if (isConnected && !isLoading) {
       console.log("Connected - loading conversations...");
-      loadConversations();
+      const timer = setTimeout(() => {
+        loadConversations();
+      }, 1000); // Add delay to ensure connection is stable
+
+      return () => clearTimeout(timer);
     }
   }, [isConnected, isLoading, loadConversations]);
 
@@ -77,12 +89,12 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       // Start typing
       startTyping(currentChatUser);
 
-      // Stop typing after 1 second of no input
+      // Stop typing after 2 seconds of no input
       typingTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) {
           stopTyping(currentChatUser);
         }
-      }, 1000);
+      }, 2000);
     } else {
       // Stop typing immediately when input is cleared
       stopTyping(currentChatUser);
@@ -111,7 +123,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
   // Debounced user search
   const searchUsers = useCallback(
-    (query: string) => {
+    async (query: string) => {
       if (!query.trim()) {
         setSearchResults([]);
         return;
@@ -128,7 +140,10 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
         try {
           const response = await fetch(
-            `/api/users/search?q=${encodeURIComponent(query)}`
+            `/api/users/search?q=${encodeURIComponent(query)}`,
+            {
+              credentials: "include", // Include cookies for authentication
+            }
           );
 
           if (response.ok) {
@@ -150,12 +165,12 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             setSearchResults([]);
           }
         }
-      }, 300);
+      }, 500);
     },
     [currentUser]
   );
 
-  // Enhanced user selection with better state management
+  // Enhanced user selection with better error handling
   const handleUserSelect = useCallback(
     async (userId: string) => {
       if (
@@ -176,13 +191,10 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
         if (currentChatUser) {
           await leaveChat();
           // Small delay to ensure cleanup
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 200));
         }
 
         if (!mountedRef.current) return;
-
-        // Set new chat user
-        setCurrentChatUser(userId);
 
         // Join new chat
         await joinChat(userId);
@@ -199,12 +211,12 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           if (mountedRef.current) {
             messageInputRef.current?.focus();
           }
-        }, 200);
+        }, 300);
       } catch (error) {
         console.error("Error selecting user:", error);
         if (mountedRef.current) {
           setCurrentChatUser(null);
-          setLocalError("Failed to start chat");
+          setLocalError("Failed to start chat. Please try again.");
         }
       } finally {
         if (mountedRef.current) {
@@ -216,9 +228,9 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       isSelectingUser,
       currentChatUser,
       leaveChat,
-      setCurrentChatUser,
       joinChat,
       clearError,
+      setCurrentChatUser,
     ]
   );
 
@@ -254,7 +266,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       if (mountedRef.current) {
         // Restore message input on error
         setMessageInput(messageContent);
-        setLocalError("Failed to send message");
+        setLocalError("Failed to send message. Please try again.");
       }
     } finally {
       if (mountedRef.current) {
@@ -321,7 +333,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
         if (mountedRef.current) {
           markAsRead(currentChatUser);
         }
-      }, 1000);
+      }, 1500);
 
       return () => clearTimeout(timer);
     }
@@ -341,6 +353,13 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
   // Combined error display
   const displayError = error || localError;
+
+  // Connection retry handler
+  const handleRetryConnection = useCallback(() => {
+    setLocalError(null);
+    clearError();
+    window.location.reload(); // Simple retry by reloading
+  }, [clearError]);
 
   return (
     <div className={`flex h-full bg-white ${className}`}>
@@ -380,19 +399,30 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           </div>
 
           {/* Connection Status */}
-          <div className="flex items-center mt-2">
-            <div
-              className={`w-2 h-2 rounded-full mr-2 transition-colors ${
-                isConnected ? "bg-green-500" : "bg-red-500"
-              }`}
-            />
-            <span className="text-sm text-gray-600">
-              {isConnected ? "Connected" : "Disconnected"}
-            </span>
-            {isSelectingUser && (
-              <span className="text-xs text-blue-600 ml-2 animate-pulse">
-                Loading...
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center">
+              <div
+                className={`w-2 h-2 rounded-full mr-2 transition-colors ${
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
+              <span className="text-sm text-gray-600">
+                {isConnected ? "Connected" : "Disconnected"}
               </span>
+              {isSelectingUser && (
+                <span className="text-xs text-blue-600 ml-2 animate-pulse">
+                  Loading...
+                </span>
+              )}
+            </div>
+
+            {!isConnected && (
+              <button
+                onClick={handleRetryConnection}
+                className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Retry
+              </button>
             )}
           </div>
         </div>
