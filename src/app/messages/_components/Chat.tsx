@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useChat } from "@/hooks/use-socket"; // Adjust import path
+import type React from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useChat } from "@/hooks/use-socket";
 import { formatDistanceToNow } from "date-fns";
 
 interface ChatComponentProps {
@@ -40,32 +41,20 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     messagesEndRef,
   } = useChat();
 
+  // Component state
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSelectingUser, setIsSelectingUser] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Refs
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Debug logging
-  useEffect(() => {
-    console.log("Chat Component State:", {
-      isConnected,
-      messagesCount: messages.length,
-      conversationsCount: conversations.length,
-      currentChatUser,
-      unreadCount,
-      isSelectingUser,
-    });
-  }, [
-    isConnected,
-    messages,
-    conversations,
-    currentChatUser,
-    unreadCount,
-    isSelectingUser,
-  ]);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
   // Load conversations when connected
   useEffect(() => {
@@ -75,29 +64,28 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     }
   }, [isConnected, isLoading, loadConversations]);
 
-  // Handle typing indicators with improved debouncing
+  // Improved typing indicators with debouncing
   useEffect(() => {
-    if (currentChatUser && messageInput.length > 0 && isConnected) {
-      startTyping(currentChatUser);
+    if (!currentChatUser || !isConnected || !mountedRef.current) return;
 
-      // Clear existing timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (messageInput.length > 0) {
+      // Start typing
+      startTyping(currentChatUser);
 
       // Stop typing after 1 second of no input
       typingTimeoutRef.current = setTimeout(() => {
-        if (currentChatUser) {
+        if (mountedRef.current) {
           stopTyping(currentChatUser);
         }
       }, 1000);
-    } else if (currentChatUser && messageInput.length === 0) {
+    } else {
       // Stop typing immediately when input is cleared
       stopTyping(currentChatUser);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-      }
     }
 
     return () => {
@@ -109,119 +97,202 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
   // Cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
     };
   }, []);
 
-  // Search users function
+  // Debounced user search
   const searchUsers = useCallback(
-    async (query: string) => {
+    (query: string) => {
       if (!query.trim()) {
         setSearchResults([]);
         return;
       }
 
-      try {
-        const response = await fetch(
-          `/api/users/search?q=${encodeURIComponent(query)}`
-        );
-        if (response.ok) {
-          const users = await response.json();
-          setSearchResults(
-            users.filter((user: any) => user.id !== currentUser.id)
-          );
-        } else {
-          console.error("Failed to search users:", response.statusText);
-          setSearchResults([]);
-        }
-      } catch (error) {
-        console.error("Error searching users:", error);
-        setSearchResults([]);
+      // Clear existing timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
+
+      // Debounce search requests
+      searchTimeoutRef.current = setTimeout(async () => {
+        if (!mountedRef.current) return;
+
+        try {
+          const response = await fetch(
+            `/api/users/search?q=${encodeURIComponent(query)}`
+          );
+
+          if (response.ok) {
+            const users = await response.json();
+            if (mountedRef.current) {
+              setSearchResults(
+                users.filter((user: any) => user.id !== currentUser.id)
+              );
+            }
+          } else {
+            console.error("Failed to search users:", response.statusText);
+            if (mountedRef.current) {
+              setSearchResults([]);
+            }
+          }
+        } catch (error) {
+          console.error("Error searching users:", error);
+          if (mountedRef.current) {
+            setSearchResults([]);
+          }
+        }
+      }, 300);
     },
     [currentUser]
   );
 
+  // Enhanced user selection with better state management
   const handleUserSelect = useCallback(
     async (userId: string) => {
-      if (isSelectingUser || userId === currentChatUser) {
-        return; // Prevent multiple simultaneous selections or selecting the same user
+      if (
+        isSelectingUser ||
+        userId === currentChatUser ||
+        !mountedRef.current
+      ) {
+        return;
       }
 
       console.log("Selecting user:", userId);
       setIsSelectingUser(true);
+      setLocalError(null);
+      clearError();
 
       try {
-        // Clear any existing chat first
+        // Leave current chat first if exists
         if (currentChatUser) {
           await leaveChat();
+          // Small delay to ensure cleanup
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        // Set the new chat user
+        if (!mountedRef.current) return;
+
+        // Set new chat user
         setCurrentChatUser(userId);
 
-        // Join the new chat
+        // Join new chat
         await joinChat(userId);
 
-        // Close search and clear search state
+        if (!mountedRef.current) return;
+
+        // Close search interface
         setShowUserSearch(false);
         setSearchQuery("");
         setSearchResults([]);
 
-        // Focus on message input after selecting user
+        // Focus message input
         setTimeout(() => {
-          messageInputRef.current?.focus();
+          if (mountedRef.current) {
+            messageInputRef.current?.focus();
+          }
         }, 200);
       } catch (error) {
         console.error("Error selecting user:", error);
-        // Reset state on error
-        setCurrentChatUser(null);
+        if (mountedRef.current) {
+          setCurrentChatUser(null);
+          setLocalError("Failed to start chat");
+        }
       } finally {
-        setIsSelectingUser(false);
+        if (mountedRef.current) {
+          setIsSelectingUser(false);
+        }
       }
     },
-    [isSelectingUser, currentChatUser, leaveChat, setCurrentChatUser, joinChat]
+    [
+      isSelectingUser,
+      currentChatUser,
+      leaveChat,
+      setCurrentChatUser,
+      joinChat,
+      clearError,
+    ]
   );
 
-  const handleSendMessage = useCallback(() => {
-    if (!messageInput.trim() || !currentChatUser || !isConnected) {
-      console.warn(
-        "Cannot send message: empty input, no chat user, or not connected"
-      );
+  // Enhanced message sending with better error handling
+  const handleSendMessage = useCallback(async () => {
+    if (
+      !messageInput.trim() ||
+      !currentChatUser ||
+      !isConnected ||
+      isSendingMessage ||
+      !mountedRef.current
+    ) {
       return;
     }
 
-    console.log("Sending message:", messageInput, "to:", currentChatUser);
-    sendMessage(currentChatUser, messageInput);
-    setMessageInput("");
+    const messageContent = messageInput.trim();
+    setIsSendingMessage(true);
+    setMessageInput(""); // Clear input immediately for better UX
+    setLocalError(null);
+    clearError();
 
-    // Stop typing indicator
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = null;
+    try {
+      await sendMessage(currentChatUser, messageContent);
+
+      // Stop typing indicator
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      stopTyping(currentChatUser);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      if (mountedRef.current) {
+        // Restore message input on error
+        setMessageInput(messageContent);
+        setLocalError("Failed to send message");
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsSendingMessage(false);
+      }
     }
-    stopTyping(currentChatUser);
-  }, [messageInput, currentChatUser, isConnected, sendMessage, stopTyping]);
+  }, [
+    messageInput,
+    currentChatUser,
+    isConnected,
+    isSendingMessage,
+    sendMessage,
+    stopTyping,
+    clearError,
+  ]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+  // Keyboard event handler
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    },
+    [handleSendMessage]
+  );
 
-  const formatMessageTime = (createdAt: string) => {
+  // Format message time with error handling
+  const formatMessageTime = useCallback((createdAt: string) => {
     try {
       return formatDistanceToNow(new Date(createdAt), { addSuffix: true });
     } catch (error) {
       console.error("Error formatting message time:", error);
       return "Unknown time";
     }
-  };
+  }, []);
 
+  // Get current chat user info
   const getCurrentChatUserInfo = useCallback(() => {
     if (!currentChatUser) return null;
     const conversation = getConversationByUserId(currentChatUser);
@@ -237,25 +308,39 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
   const currentChatUserInfo = getCurrentChatUserInfo();
 
-  // Handle marking messages as read when entering chat
+  // Mark messages as read when chat is active
   useEffect(() => {
-    if (currentChatUser && messages.length > 0 && isConnected) {
-      // Mark messages as read after a short delay
+    if (
+      currentChatUser &&
+      messages.length > 0 &&
+      isConnected &&
+      !isLoading &&
+      mountedRef.current
+    ) {
       const timer = setTimeout(() => {
-        markAsRead(currentChatUser);
+        if (mountedRef.current) {
+          markAsRead(currentChatUser);
+        }
       }, 1000);
 
       return () => clearTimeout(timer);
     }
-  }, [currentChatUser, messages.length, markAsRead, isConnected]);
+  }, [currentChatUser, messages.length, markAsRead, isConnected, isLoading]);
 
   // Handle leaving chat
   const handleLeaveChat = useCallback(async () => {
-    if (currentChatUser) {
-      await leaveChat();
-      setCurrentChatUser(null);
+    if (currentChatUser && !isSelectingUser && mountedRef.current) {
+      try {
+        await leaveChat();
+        setCurrentChatUser(null);
+      } catch (error) {
+        console.error("Error leaving chat:", error);
+      }
     }
-  }, [currentChatUser, leaveChat, setCurrentChatUser]);
+  }, [currentChatUser, leaveChat, setCurrentChatUser, isSelectingUser]);
+
+  // Combined error display
+  const displayError = error || localError;
 
   return (
     <div className={`flex h-full bg-white ${className}`}>
@@ -273,7 +358,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
               )}
               <button
                 onClick={() => setShowUserSearch(!showUserSearch)}
-                className="p-2 hover:bg-gray-100 rounded-full"
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 title="Start new chat"
                 disabled={isSelectingUser}
               >
@@ -297,7 +382,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           {/* Connection Status */}
           <div className="flex items-center mt-2">
             <div
-              className={`w-2 h-2 rounded-full mr-2 ${
+              className={`w-2 h-2 rounded-full mr-2 transition-colors ${
                 isConnected ? "bg-green-500" : "bg-red-500"
               }`}
             />
@@ -305,12 +390,8 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
               {isConnected ? "Connected" : "Disconnected"}
             </span>
             {isSelectingUser && (
-              <span className="text-xs text-blue-600 ml-2">Selecting...</span>
-            )}
-            {/* Debug info in development */}
-            {process.env.NODE_ENV === "development" && (
-              <span className="text-xs text-gray-400 ml-2">
-                M:{messages.length} C:{conversations.length}
+              <span className="text-xs text-blue-600 ml-2 animate-pulse">
+                Loading...
               </span>
             )}
           </div>
@@ -318,7 +399,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
         {/* User Search */}
         {showUserSearch && (
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
             <input
               type="text"
               placeholder="Search users..."
@@ -327,37 +408,54 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                 setSearchQuery(e.target.value);
                 searchUsers(e.target.value);
               }}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               disabled={isSelectingUser}
+              autoFocus
             />
 
             {/* Search Results */}
             {searchResults.length > 0 && (
-              <div className="mt-2 max-h-40 overflow-y-auto">
+              <div className="mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-sm">
                 {searchResults.map((user) => (
                   <div
                     key={user.id}
                     onClick={() =>
                       !isSelectingUser && handleUserSelect(user.id)
                     }
-                    className={`flex items-center p-2 rounded cursor-pointer ${
+                    className={`flex items-center p-3 cursor-pointer transition-colors ${
                       isSelectingUser
                         ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-gray-100"
+                        : "hover:bg-gray-50"
                     }`}
                   >
                     <img
-                      src={user.image || "/default-avatar.png"}
-                      alt={user.name}
-                      className="w-8 h-8 rounded-full mr-3"
+                      src={user.image || "/placeholder.svg?height=32&width=32"}
+                      alt={user.name || user.username || "User"}
+                      className="w-8 h-8 rounded-full mr-3 object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          "/placeholder.svg?height=32&width=32";
+                      }}
                     />
-                    <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-sm text-gray-600">@{user.username}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {user.name || user.username || "Unknown User"}
+                      </p>
+                      {user.username && (
+                        <p className="text-sm text-gray-600 truncate">
+                          @{user.username}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
+            )}
+
+            {searchQuery && searchResults.length === 0 && (
+              <p className="text-sm text-gray-500 mt-2 text-center">
+                No users found
+              </p>
             )}
           </div>
         )}
@@ -370,7 +468,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
               onClick={() =>
                 !isSelectingUser && handleUserSelect(conversation.other_user_id)
               }
-              className={`flex items-center p-4 cursor-pointer border-b border-gray-100 ${
+              className={`flex items-center p-4 cursor-pointer border-b border-gray-100 transition-colors ${
                 currentChatUser === conversation.other_user_id
                   ? "bg-blue-50 border-blue-200"
                   : isSelectingUser
@@ -380,13 +478,20 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             >
               <div className="relative">
                 <img
-                  src={conversation.image || "/default-avatar.png"}
+                  src={
+                    conversation.image || "/placeholder.svg?height=48&width=48"
+                  }
                   alt={conversation.name || conversation.username || "User"}
-                  className="w-12 h-12 rounded-full mr-3"
+                  className="w-12 h-12 rounded-full mr-3 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "/placeholder.svg?height=48&width=48";
+                  }}
                 />
                 {conversation.unread_count > 0 && (
                   <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {conversation.unread_count}
+                    {conversation.unread_count > 99
+                      ? "99+"
+                      : conversation.unread_count}
                   </div>
                 )}
               </div>
@@ -398,12 +503,12 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                       conversation.username ||
                       "Unknown User"}
                   </p>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
                     {formatMessageTime(conversation.createdAt)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 truncate mt-1">
-                  {conversation.content}
+                  {conversation.content || "No messages yet"}
                 </p>
               </div>
             </div>
@@ -411,25 +516,28 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
           {conversations.length === 0 && isConnected && !isLoading && (
             <div className="p-8 text-center text-gray-500">
+              <svg
+                className="w-12 h-12 text-gray-300 mx-auto mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
               <p>No conversations yet</p>
-              <p className="text-sm mt-2">
-                Click the + button to start a new chat
-              </p>
-            </div>
-          )}
-
-          {(!isConnected || isLoading) && (
-            <div className="p-8 text-center text-gray-500">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-              <p>{isLoading ? "Loading..." : "Connecting..."}</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Chat Area */}
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        {currentChatUser && currentChatUserInfo ? (
+        {currentChatUser ? (
           <>
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 bg-white">
@@ -437,7 +545,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                 <div className="flex items-center">
                   <button
                     onClick={handleLeaveChat}
-                    className="p-2 hover:bg-gray-100 rounded-full mr-3 md:hidden"
+                    className="mr-3 p-1 hover:bg-gray-100 rounded-full transition-colors lg:hidden"
                     disabled={isSelectingUser}
                   >
                     <svg
@@ -455,33 +563,45 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                     </svg>
                   </button>
 
-                  <img
-                    src={currentChatUserInfo.image || "/default-avatar.png"}
-                    alt={
-                      currentChatUserInfo.name ||
-                      currentChatUserInfo.username ||
-                      "User"
-                    }
-                    className="w-10 h-10 rounded-full mr-3"
-                  />
-
-                  <div>
-                    <h3 className="font-semibold">
-                      {currentChatUserInfo.name ||
-                        currentChatUserInfo.username ||
-                        "Unknown User"}
-                    </h3>
-                    {typingUsers.has(currentChatUser) && (
-                      <p className="text-sm text-blue-600">Typing...</p>
-                    )}
-                  </div>
+                  {currentChatUserInfo && (
+                    <>
+                      <img
+                        src={
+                          currentChatUserInfo.image ||
+                          "/placeholder.svg?height=40&width=40"
+                        }
+                        alt={
+                          currentChatUserInfo.name ||
+                          currentChatUserInfo.username ||
+                          "User"
+                        }
+                        className="w-10 h-10 rounded-full mr-3 object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            "/placeholder.svg?height=40&width=40";
+                        }}
+                      />
+                      <div>
+                        <h3 className="font-semibold">
+                          {currentChatUserInfo.name ||
+                            currentChatUserInfo.username ||
+                            "Unknown User"}
+                        </h3>
+                        {typingUsers.has(currentChatUser) && (
+                          <p className="text-sm text-green-600 animate-pulse">
+                            Typing...
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <button
-                  onClick={() => markAsRead(currentChatUser)}
-                  className="p-2 hover:bg-gray-100 rounded-full"
-                  title="Mark as read"
-                  disabled={!isConnected}
+                  onClick={handleLeaveChat}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors hidden lg:block"
+                  disabled={isSelectingUser}
+                  title="Close chat"
                 >
                   <svg
                     className="w-5 h-5"
@@ -493,7 +613,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M5 13l4 4L19 7"
+                      d="M6 18L18 6M6 6l12 12"
                     />
                   </svg>
                 </button>
@@ -501,51 +621,97 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {isLoading ? (
                 <div className="flex justify-center items-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <span className="ml-2 text-gray-600">
+                    Loading messages...
+                  </span>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex justify-center items-center h-full text-gray-500">
+                  <div className="text-center">
+                    <svg
+                      className="w-16 h-16 text-gray-300 mx-auto mb-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
+                    </svg>
+                    <p className="text-lg">No messages yet</p>
+                    <p className="text-sm mt-1">Start the conversation!</p>
+                  </div>
                 </div>
               ) : (
                 <>
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${
-                        message.senderId === currentUser.id
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
-                    >
+                  {messages.map((message) => {
+                    const isMyMessage = message.senderId === currentUser.id;
+                    return (
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.senderId === currentUser.id
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-200 text-gray-800"
+                        key={message.id}
+                        className={`flex ${
+                          isMyMessage ? "justify-end" : "justify-start"
                         }`}
                       >
-                        <p className="break-words">{message.content}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs opacity-75">
-                            {formatMessageTime(message.createdAt)}
-                          </span>
-                          {message.senderId === currentUser.id && (
-                            <span className="text-xs opacity-75 ml-2">
-                              {message.read ? "✓✓" : "✓"}
-                            </span>
-                          )}
+                        <div
+                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                            isMyMessage
+                              ? "bg-blue-500 text-white"
+                              : "bg-white text-gray-800 border border-gray-200"
+                          }`}
+                        >
+                          <p className="text-sm leading-relaxed">
+                            {message.content}
+                          </p>
+                          <div
+                            className={`flex items-center justify-between mt-1 text-xs ${
+                              isMyMessage ? "text-blue-100" : "text-gray-500"
+                            }`}
+                          >
+                            <span>{formatMessageTime(message.createdAt)}</span>
+                            {isMyMessage && (
+                              <span className="ml-2">
+                                {message.read ? (
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-
-                  {messages.length === 0 && !isLoading && (
-                    <div className="text-center text-gray-500 py-8">
-                      <p>No messages yet</p>
-                      <p className="text-sm mt-2">Start the conversation!</p>
-                    </div>
-                  )}
-
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </>
               )}
@@ -553,36 +719,64 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
             {/* Message Input */}
             <div className="p-4 border-t border-gray-200 bg-white">
-              {error && (
-                <div className="mb-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
-                  {error}
-                  <button
-                    onClick={clearError}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    ×
-                  </button>
+              {displayError && (
+                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-red-600">{displayError}</p>
+                    <button
+                      onClick={() => {
+                        clearError();
+                        setLocalError(null);
+                      }}
+                      className="text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <div className="flex items-center space-x-2">
-                <input
-                  ref={messageInputRef}
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type a message..."
-                  className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!isConnected || isSelectingUser}
-                />
+              <div className="flex items-end space-x-2">
+                <div className="flex-1 relative">
+                  <input
+                    ref={messageInputRef}
+                    type="text"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={
+                      isConnected
+                        ? "Type a message..."
+                        : "Waiting for connection..."
+                    }
+                    disabled={!isConnected || isSendingMessage}
+                    className="w-full p-3 pr-12 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {isSendingMessage && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    </div>
+                  )}
+                </div>
 
                 <button
                   onClick={handleSendMessage}
                   disabled={
-                    !messageInput.trim() || !isConnected || isSelectingUser
+                    !messageInput.trim() || !isConnected || isSendingMessage
                   }
-                  className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-3 bg-blue-500 text-white rounded-2xl hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <svg
                     className="w-5 h-5"
@@ -602,11 +796,11 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             </div>
           </>
         ) : (
-          /* No Chat Selected */
+          // No Chat Selected State
           <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
+            <div className="text-center text-gray-500">
               <svg
-                className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                className="w-20 h-20 text-gray-300 mx-auto mb-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -618,14 +812,18 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                   d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                 />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {isSelectingUser ? "Loading chat..." : "Select a conversation"}
+              <h3 className="text-xl font-semibold mb-2">
+                Welcome to Messages
               </h3>
-              <p className="text-gray-600">
-                {isSelectingUser
-                  ? "Please wait while we load your chat"
-                  : "Choose from your existing conversations or start a new one"}
+              <p className="text-gray-400 mb-6">
+                Select a conversation from the sidebar to start chatting
               </p>
+              <button
+                onClick={() => setShowUserSearch(true)}
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Start New Chat
+              </button>
             </div>
           </div>
         )}
