@@ -65,6 +65,12 @@ export const useChat = (options: UseChatOptions = {}) => {
   const isConnectingRef = useRef(false);
   const messageIdsRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
+  const currentChatUserRef = useRef<string | null>(null);
+
+  // Keep currentChatUserRef in sync
+  useEffect(() => {
+    currentChatUserRef.current = currentChatUser;
+  }, [currentChatUser]);
 
   // Stable event handlers using useCallback with proper dependencies
   const handleConnect = useCallback(() => {
@@ -73,6 +79,13 @@ export const useChat = (options: UseChatOptions = {}) => {
     setIsConnected(true);
     setError(null);
     isConnectingRef.current = false;
+
+    // Auto-load conversations on connect
+    setTimeout(() => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit("get_conversations");
+      }
+    }, 100);
   }, []);
 
   const handleDisconnect = useCallback((reason: string) => {
@@ -94,74 +107,88 @@ export const useChat = (options: UseChatOptions = {}) => {
     isConnectingRef.current = false;
   }, []);
 
-  const handleNewMessage = useCallback(
-    (message: Message) => {
-      if (!mountedRef.current) return;
-      console.log("📨 Received new message:", message);
+  const handleNewMessage = useCallback((message: Message) => {
+    if (!mountedRef.current) return;
+    console.log("📨 Received new message:", message);
 
-      setMessages((prev) => {
-        // Check for duplicates
-        if (messageIdsRef.current.has(message.id)) {
-          return prev;
-        }
+    setMessages((prev) => {
+      // Check for duplicates
+      if (messageIdsRef.current.has(message.id)) {
+        return prev;
+      }
 
-        messageIdsRef.current.add(message.id);
+      messageIdsRef.current.add(message.id);
+
+      // Only add to messages if we're in the current chat
+      const currentChat = currentChatUserRef.current;
+      const isInCurrentChat =
+        currentChat === message.senderId || currentChat === message.receiverId;
+
+      if (isInCurrentChat) {
         // Sort messages by creation date to maintain order
         const newMessages = [...prev, message].sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         return newMessages;
-      });
+      }
 
-      // Update conversations list with latest message or create new conversation
-      setConversations((prev) => {
-        const otherUserId =
-          message.senderId === currentChatUser
-            ? message.receiverId
-            : message.senderId;
-        const existingConvIndex = prev.findIndex(
-          (conv) => conv.other_user_id === otherUserId
+      return prev;
+    });
+
+    // Always update conversations regardless of current chat
+    setConversations((prev) => {
+      const currentUserId = currentChatUserRef.current;
+      const otherUserId =
+        message.senderId === currentUserId
+          ? message.receiverId
+          : message.senderId;
+
+      const existingConvIndex = prev.findIndex(
+        (conv) => conv.other_user_id === otherUserId
+      );
+
+      if (existingConvIndex >= 0) {
+        // Update existing conversation
+        const updatedConversations = [...prev];
+        const isCurrentChat = currentUserId === otherUserId;
+
+        updatedConversations[existingConvIndex] = {
+          ...updatedConversations[existingConvIndex],
+          content: message.content,
+          createdAt: message.createdAt,
+          unread_count:
+            message.senderId !== currentUserId && !isCurrentChat
+              ? updatedConversations[existingConvIndex].unread_count + 1
+              : updatedConversations[existingConvIndex].unread_count,
+        };
+
+        // Move to top and sort
+        return updatedConversations.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
+      } else {
+        // Create new conversation for new user
+        const newConversation: Conversation = {
+          id: `conv_${otherUserId}`,
+          other_user_id: otherUserId,
+          content: message.content,
+          createdAt: message.createdAt,
+          name: message.sender.name,
+          username: message.sender.username,
+          image: message.sender.image,
+          user_id: message.receiverId,
+          unread_count: message.senderId !== currentUserId ? 1 : 0,
+        };
 
-        if (existingConvIndex >= 0) {
-          // Update existing conversation
-          const updatedConversations = [...prev];
-          updatedConversations[existingConvIndex] = {
-            ...updatedConversations[existingConvIndex],
-            content: message.content,
-            createdAt: message.createdAt,
-            unread_count:
-              message.senderId !== currentChatUser
-                ? updatedConversations[existingConvIndex].unread_count + 1
-                : updatedConversations[existingConvIndex].unread_count,
-          };
-          return updatedConversations.sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        } else {
-          // Create new conversation for new user
-          const newConversation: Conversation = {
-            id: `conv_${otherUserId}`,
-            other_user_id: otherUserId,
-            content: message.content,
-            createdAt: message.createdAt,
-            name: message.sender.name,
-            username: message.sender.username,
-            image: message.sender.image,
-            user_id: message.receiverId,
-            unread_count: message.senderId !== currentChatUser ? 1 : 0,
-          };
-          return [newConversation, ...prev].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        }
-      });
-    },
-    [currentChatUser]
-  );
+        return [newConversation, ...prev].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+    });
+  }, []);
 
   const handleChatHistory = useCallback((history: Message[]) => {
     if (!mountedRef.current) return;
@@ -182,6 +209,7 @@ export const useChat = (options: UseChatOptions = {}) => {
   const handleConversations = useCallback((convs: Conversation[]) => {
     if (!mountedRef.current) return;
     console.log("💬 Received conversations:", convs.length);
+
     // Sort conversations by latest message
     const sortedConvs = convs.sort(
       (a, b) =>
@@ -217,7 +245,7 @@ export const useChat = (options: UseChatOptions = {}) => {
 
     setMessages((prev) =>
       prev.map((msg) =>
-        msg.senderId === readBy ? { ...msg, read: true } : msg
+        msg.receiverId === readBy ? { ...msg, read: true } : msg
       )
     );
   }, []);
@@ -228,7 +256,7 @@ export const useChat = (options: UseChatOptions = {}) => {
     setError(message);
   }, []);
 
-  // Initialize socket connection with better cleanup
+  // Initialize socket connection
   useEffect(() => {
     if (
       !autoConnect ||
@@ -350,6 +378,9 @@ export const useChat = (options: UseChatOptions = {}) => {
         throw new Error(errorMsg);
       }
 
+      // Set current chat user BEFORE making the request
+      setCurrentChatUser(otherUserId);
+
       console.log("👥 Joining chat with:", otherUserId);
       setIsLoading(true);
       setMessages([]);
@@ -358,30 +389,29 @@ export const useChat = (options: UseChatOptions = {}) => {
 
       return new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          // For new conversations, we might not get chat_history, so resolve anyway
           console.log("⏰ Join chat timeout - assuming new conversation");
           setIsLoading(false);
           resolve();
-        }, 5000); // Reduced timeout for better UX
+        }, 3000);
 
         const handleHistoryOnce = (history: Message[]) => {
           clearTimeout(timeout);
           socketRef.current?.off("chat_history", handleHistoryOnce);
+          socketRef.current?.off("error", handleErrorOnce);
           setIsLoading(false);
           resolve();
         };
 
-        // Handle both existing conversations and new ones
-        const handleError = (error: any) => {
+        const handleErrorOnce = (error: any) => {
           clearTimeout(timeout);
           socketRef.current?.off("chat_history", handleHistoryOnce);
-          socketRef.current?.off("error", handleError);
+          socketRef.current?.off("error", handleErrorOnce);
           setIsLoading(false);
           reject(error);
         };
 
-        socketRef.current?.on("chat_history", handleHistoryOnce);
-        socketRef.current?.on("error", handleError);
+        socketRef.current?.once("chat_history", handleHistoryOnce);
+        socketRef.current?.once("error", handleErrorOnce);
         socketRef.current?.emit("join_chat", { otherUserId });
       });
     },
@@ -405,13 +435,13 @@ export const useChat = (options: UseChatOptions = {}) => {
           name: userInfo?.name || null,
           username: userInfo?.username || null,
           image: userInfo?.image || null,
-          user_id: currentChatUser || "",
+          user_id: currentChatUserRef.current || "",
           unread_count: 0,
         };
         return [newConversation, ...prev];
       });
     },
-    [currentChatUser]
+    []
   );
 
   // Send a message with validation
@@ -447,12 +477,11 @@ export const useChat = (options: UseChatOptions = {}) => {
 
       return new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          // Don't reject immediately, the message might still be sent
           console.log(
             "⏰ Send message timeout - but message may have been sent"
           );
-          resolve(); // Resolve instead of reject to prevent error display
-        }, 8000);
+          resolve();
+        }, 5000);
 
         const handleSentOnce = ({
           messageId,
@@ -463,7 +492,9 @@ export const useChat = (options: UseChatOptions = {}) => {
         }) => {
           clearTimeout(timeout);
           socketRef.current?.off("message_sent", handleSentOnce);
-          if (status === "success") {
+          socketRef.current?.off("new_message", handleNewMessageOnce);
+
+          if (status === "delivered") {
             resolve();
           } else {
             reject(new Error("Failed to send message"));
@@ -471,7 +502,6 @@ export const useChat = (options: UseChatOptions = {}) => {
         };
 
         const handleNewMessageOnce = (message: Message) => {
-          // If we receive the message we just sent, consider it successful
           if (
             message.receiverId === receiverId &&
             message.content === content.trim()
@@ -483,8 +513,8 @@ export const useChat = (options: UseChatOptions = {}) => {
           }
         };
 
-        socketRef.current?.on("message_sent", handleSentOnce);
-        socketRef.current?.on("new_message", handleNewMessageOnce);
+        socketRef.current?.once("message_sent", handleSentOnce);
+        socketRef.current?.once("new_message", handleNewMessageOnce);
         socketRef.current?.emit("send_message", {
           receiverId,
           content: content.trim(),
@@ -535,6 +565,20 @@ export const useChat = (options: UseChatOptions = {}) => {
 
       console.log("✅ Marking messages as read from:", senderId);
       socketRef.current.emit("mark_read", { senderId });
+
+      // Update local state immediately for better UX
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.senderId === senderId ? { ...msg, read: true } : msg
+        )
+      );
+
+      // Update conversation unread count
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.other_user_id === senderId ? { ...conv, unread_count: 0 } : conv
+        )
+      );
     },
     [isConnected]
   );
@@ -564,10 +608,12 @@ export const useChat = (options: UseChatOptions = {}) => {
       stopTyping(currentChatUser);
     }
 
+    setCurrentChatUser(null);
     setMessages([]);
     messageIdsRef.current.clear();
     setIsLoading(false);
     setError(null);
+    setTypingUsers(new Set());
 
     return Promise.resolve();
   }, [currentChatUser, stopTyping]);
