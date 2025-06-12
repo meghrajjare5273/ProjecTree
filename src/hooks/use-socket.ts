@@ -59,6 +59,9 @@ export const useChat = (options: UseChatOptions) => {
   const [currentChatUser, setCurrentChatUser] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Add ref for messages container (needed for scroll detection)
 
   // Refs
   const socketRef = useRef<Socket | null>(null);
@@ -68,6 +71,8 @@ export const useChat = (options: UseChatOptions) => {
   const messageIdsRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
   const reconnectAttemptsRef = useRef(0);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   const maxReconnectAttempts = 5;
 
   // Enhanced cleanup function
@@ -222,6 +227,78 @@ export const useChat = (options: UseChatOptions) => {
     [currentUserId, currentChatUser]
   );
 
+  // Handler for more messages
+  const handleMoreMessages = useCallback((newMessages: Message[]) => {
+    if (!mountedRef.current) return;
+
+    const uniqueNewMessages = newMessages.filter(
+      (msg) => !messageIdsRef.current.has(msg.id)
+    );
+
+    if (uniqueNewMessages.length > 0) {
+      setMessages((prev) => {
+        const allMessages = [...uniqueNewMessages, ...prev];
+        // Sorting ensures consistency, though server should provide ascending order
+        return allMessages.sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
+
+      uniqueNewMessages.forEach((msg) => messageIdsRef.current.add(msg.id));
+    }
+  }, []);
+
+  // Function to load more messages
+  const loadMoreMessages = useCallback(() => {
+    if (!socketRef.current || !isConnected || !currentChatUser || isLoadingMore)
+      return;
+
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+
+    setIsLoadingMore(true);
+    socketRef.current.emit("load_more_messages", {
+      otherUserId: currentChatUser,
+      before: oldestMessage.createdAt,
+    });
+
+    // Handle response
+    const handleMoreMessagesOnce = (newMessages: Message[]) => {
+      handleMoreMessages(newMessages);
+      setIsLoadingMore(false);
+    };
+
+    const handleErrorOnce = () => {
+      setIsLoadingMore(false);
+    };
+
+    socketRef.current.once("more_messages", handleMoreMessagesOnce);
+    socketRef.current.once("error", handleErrorOnce);
+  }, [
+    isConnected,
+    currentChatUser,
+    messages,
+    isLoadingMore,
+    handleMoreMessages,
+  ]);
+
+  // Add event listener in the socket initialization (inside the useEffect)
+
+  // Modify the auto-scroll useEffect to only scroll when near the bottom
+  useEffect(() => {
+    if (messagesEndRef.current && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const isAtBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        100;
+
+      if (isAtBottom) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [messages]);
+
   const handleChatHistory = useCallback((history: Message[]) => {
     if (!mountedRef.current) return;
     console.log("📜 Received chat history:", history.length, "messages");
@@ -324,6 +401,7 @@ export const useChat = (options: UseChatOptions) => {
         newSocket.on("user_typing", handleUserTyping);
         newSocket.on("messages_read", handleMessagesRead);
         newSocket.on("error", handleError);
+        newSocket.on("more_messages", handleMoreMessages);
 
         socketRef.current = newSocket;
       } catch (error) {
@@ -358,6 +436,7 @@ export const useChat = (options: UseChatOptions) => {
     handleUserTyping,
     handleMessagesRead,
     handleError,
+    handleMoreMessages,
   ]);
 
   // Auto-scroll to bottom
@@ -405,11 +484,17 @@ export const useChat = (options: UseChatOptions) => {
         }
 
         const timeout = setTimeout(() => {
+          console.log(
+            `⏳ Timeout waiting for chat_history from ${otherUserId}`
+          );
           setIsLoading(false);
           resolve(); // Resolve even on timeout for new conversations
         }, 10000);
 
         const handleHistoryOnce = (history: Message[]) => {
+          console.log(
+            `✅ Chat history received for ${otherUserId}: ${history.length} messages`
+          );
           clearTimeout(timeout);
           socketRef.current?.off("chat_history", handleHistoryOnce);
           socketRef.current?.off("error", handleErrorOnce);
@@ -417,6 +502,7 @@ export const useChat = (options: UseChatOptions) => {
         };
 
         const handleErrorOnce = (errorData: any) => {
+          console.log(`❌ Error joining chat with ${otherUserId}:`, errorData);
           clearTimeout(timeout);
           socketRef.current?.off("chat_history", handleHistoryOnce);
           socketRef.current?.off("error", handleErrorOnce);
@@ -427,6 +513,7 @@ export const useChat = (options: UseChatOptions) => {
         socketRef.current?.once("chat_history", handleHistoryOnce);
         socketRef.current?.once("error", handleErrorOnce);
         socketRef.current?.emit("join_chat", { otherUserId });
+        console.log(`📤 Emitted join_chat for ${otherUserId}`);
       });
     },
     [isConnected, currentChatUser]
@@ -629,5 +716,9 @@ export const useChat = (options: UseChatOptions) => {
     // Utilities
     getConversationByUserId,
     messagesEndRef,
+
+    isLoadingMore,
+    loadMoreMessages,
+    messagesContainerRef,
   };
 };

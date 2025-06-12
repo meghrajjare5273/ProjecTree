@@ -44,6 +44,9 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     clearError,
     getConversationByUserId,
     messagesEndRef,
+    isLoadingMore,
+    loadMoreMessages,
+    messagesContainerRef,
   } = useChat({
     currentUserId: currentUser.id, // Pass the current user ID
     autoConnect: true,
@@ -282,6 +285,24 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     stopTyping,
     clearError,
   ]);
+
+  // Add scroll event listener to load more messages
+  useEffect(() => {
+    const handleScroll = () => {
+      if (messagesContainerRef.current && !isLoadingMore) {
+        const { scrollTop } = messagesContainerRef.current;
+        if (scrollTop === 0 && messages.length > 0) {
+          loadMoreMessages();
+        }
+      }
+    };
+
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", handleScroll);
+      return () => container.removeEventListener("scroll", handleScroll);
+    }
+  }, [messages, loadMoreMessages, isLoadingMore, messagesContainerRef]);
 
   // Keyboard event handler
   const handleKeyPress = useCallback(
@@ -651,7 +672,18 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <div
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
+            >
+              {isLoadingMore && (
+                <div className="flex justify-center items-center p-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <span className="ml-2 text-gray-600">
+                    Loading more messages...
+                  </span>
+                </div>
+              )}
               {isLoading ? (
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
