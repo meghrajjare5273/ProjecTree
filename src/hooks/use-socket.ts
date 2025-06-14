@@ -39,7 +39,7 @@ export interface TypingUser {
 interface UseChatOptions {
   serverUrl?: string;
   autoConnect?: boolean;
-  currentUserId: string; // Make this required
+  currentUserId: string;
 }
 
 export const useChat = (options: UseChatOptions) => {
@@ -61,8 +61,6 @@ export const useChat = (options: UseChatOptions) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Add ref for messages container (needed for scroll detection)
-
   // Refs
   const socketRef = useRef<Socket | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,64 +71,83 @@ export const useChat = (options: UseChatOptions) => {
   const reconnectAttemptsRef = useRef(0);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // Add cleanup flag to prevent multiple connections
+  const cleanupRef = useRef(false);
+
+  // Add connection stability tracking
+  const connectionStableRef = useRef(false);
+  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const maxReconnectAttempts = 5;
 
   // Enhanced cleanup function
   const cleanup = useCallback(() => {
+    cleanupRef.current = true;
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
-    messageIdsRef.current.clear();
-  }, []);
 
-  // // Get authentication headers
-  // const getAuthHeaders = useCallback(async () => {
-  //   try {
-  //     // Get cookies for authentication
-  //     const cookies = document.cookie;
-  //     return {
-  //       Cookie: cookies,
-  //       Authorization: `Bearer ${localStorage.getItem("auth-token") || ""}`,
-  //     };
-  //   } catch (error) {
-  //     console.error("Error getting auth headers:", error);
-  //     return {};
-  //   }
-  // }, []);
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+
+    messageIdsRef.current.clear();
+
+    if (socketRef.current) {
+      console.log("🧹 Cleaning up socket connection...");
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    isConnectingRef.current = false;
+    connectionStableRef.current = false;
+  }, []);
 
   // Stable event handlers
   const handleConnect = useCallback(() => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
+
     console.log("✅ Connected to chat server");
     setIsConnected(true);
     setError(null);
     isConnectingRef.current = false;
     reconnectAttemptsRef.current = 0;
 
-    // Load conversations after a short delay to ensure connection is stable
-    setTimeout(() => {
-      if (socketRef.current?.connected && mountedRef.current) {
-        socketRef.current.emit("get_conversations");
+    // Mark connection as stable after a brief delay
+    connectionTimeoutRef.current = setTimeout(() => {
+      if (mountedRef.current && !cleanupRef.current) {
+        connectionStableRef.current = true;
+        // Load conversations only after connection is stable
+        if (socketRef.current?.connected) {
+          console.log("🔄 Loading conversations after stable connection");
+          socketRef.current.emit("get_conversations");
+        }
       }
-    }, 500);
+    }, 1000);
   }, []);
 
   const handleDisconnect = useCallback((reason: string) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
+
     console.log("❌ Disconnected from chat server:", reason);
     setIsConnected(false);
     isConnectingRef.current = false;
+    connectionStableRef.current = false;
 
-    if (reason !== "io client disconnect") {
+    // Only show error if it's not an intentional disconnect
+    if (reason !== "io client disconnect" && reason !== "transport close") {
       setError("Connection lost. Attempting to reconnect...");
     }
   }, []);
 
   const handleConnectError = useCallback((error: any) => {
-    if (!mountedRef.current) return;
-    console.error("❌ Connection error:", error);
+    if (!mountedRef.current || cleanupRef.current) return;
 
+    console.error("❌ Connection error:", error);
     reconnectAttemptsRef.current += 1;
 
     if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
@@ -143,12 +160,13 @@ export const useChat = (options: UseChatOptions) => {
 
     setIsConnected(false);
     isConnectingRef.current = false;
+    connectionStableRef.current = false;
   }, []);
 
   // Fixed message handling with better deduplication
   const handleNewMessage = useCallback(
     (message: Message) => {
-      if (!mountedRef.current || !currentUserId) return;
+      if (!mountedRef.current || !currentUserId || cleanupRef.current) return;
       console.log("📨 Received new message:", message);
 
       // Prevent duplicate messages
@@ -229,7 +247,7 @@ export const useChat = (options: UseChatOptions) => {
 
   // Handler for more messages
   const handleMoreMessages = useCallback((newMessages: Message[]) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
 
     const uniqueNewMessages = newMessages.filter(
       (msg) => !messageIdsRef.current.has(msg.id)
@@ -238,7 +256,6 @@ export const useChat = (options: UseChatOptions) => {
     if (uniqueNewMessages.length > 0) {
       setMessages((prev) => {
         const allMessages = [...uniqueNewMessages, ...prev];
-        // Sorting ensures consistency, though server should provide ascending order
         return allMessages.sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -251,7 +268,13 @@ export const useChat = (options: UseChatOptions) => {
 
   // Function to load more messages
   const loadMoreMessages = useCallback(() => {
-    if (!socketRef.current || !isConnected || !currentChatUser || isLoadingMore)
+    if (
+      !socketRef.current ||
+      !isConnected ||
+      !currentChatUser ||
+      isLoadingMore ||
+      cleanupRef.current
+    )
       return;
 
     const oldestMessage = messages[0];
@@ -263,14 +286,18 @@ export const useChat = (options: UseChatOptions) => {
       before: oldestMessage.createdAt,
     });
 
-    // Handle response
+    // Handle response with cleanup check
     const handleMoreMessagesOnce = (newMessages: Message[]) => {
-      handleMoreMessages(newMessages);
-      setIsLoadingMore(false);
+      if (!cleanupRef.current) {
+        handleMoreMessages(newMessages);
+        setIsLoadingMore(false);
+      }
     };
 
     const handleErrorOnce = () => {
-      setIsLoadingMore(false);
+      if (!cleanupRef.current) {
+        setIsLoadingMore(false);
+      }
     };
 
     socketRef.current.once("more_messages", handleMoreMessagesOnce);
@@ -283,10 +310,10 @@ export const useChat = (options: UseChatOptions) => {
     handleMoreMessages,
   ]);
 
-  // Add event listener in the socket initialization (inside the useEffect)
-
-  // Modify the auto-scroll useEffect to only scroll when near the bottom
+  // Improved auto-scroll with cleanup check
   useEffect(() => {
+    if (cleanupRef.current) return;
+
     if (messagesEndRef.current && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
       const isAtBottom =
@@ -300,8 +327,9 @@ export const useChat = (options: UseChatOptions) => {
   }, [messages]);
 
   const handleChatHistory = useCallback((history: Message[]) => {
-    if (!mountedRef.current) return;
-    console.log("📜 Received chat history:", history.length, "messages");
+    if (!mountedRef.current || cleanupRef.current) return;
+    console.log("📜 Received chat history:", history); // Log full history
+    console.log("📜 Chat history length:", history.length, "messages");
 
     // Clear existing message IDs and add new ones
     messageIdsRef.current.clear();
@@ -312,11 +340,12 @@ export const useChat = (options: UseChatOptions) => {
 
     sortedHistory.forEach((msg) => messageIdsRef.current.add(msg.id));
     setMessages(sortedHistory);
+    console.log("📜 Updated messages state with:", sortedHistory); // Log after update
     setIsLoading(false);
   }, []);
 
   const handleConversations = useCallback((convs: Conversation[]) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
     console.log("💬 Received conversations:", convs.length);
 
     const sortedConvs = convs.sort(
@@ -327,12 +356,12 @@ export const useChat = (options: UseChatOptions) => {
   }, []);
 
   const handleUnreadCount = useCallback((count: number) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
     setUnreadCount(count);
   }, []);
 
   const handleUserTyping = useCallback(({ userId, isTyping }: TypingUser) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
 
     setTypingUsers((prev) => {
       const newSet = new Set(prev);
@@ -346,7 +375,7 @@ export const useChat = (options: UseChatOptions) => {
   }, []);
 
   const handleMessagesRead = useCallback(({ readBy }: { readBy: string }) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
 
     setMessages((prev) =>
       prev.map((msg) =>
@@ -356,18 +385,20 @@ export const useChat = (options: UseChatOptions) => {
   }, []);
 
   const handleError = useCallback(({ message }: { message: string }) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || cleanupRef.current) return;
     console.error("❌ Socket error:", message);
     setError(message);
   }, []);
 
-  // Initialize socket connection
+  // Initialize socket connection with better stability
   useEffect(() => {
+    // Prevent multiple connections in development
     if (
       !autoConnect ||
       !currentUserId ||
       isConnectingRef.current ||
-      socketRef.current?.connected
+      socketRef.current?.connected ||
+      cleanupRef.current
     ) {
       return;
     }
@@ -377,17 +408,18 @@ export const useChat = (options: UseChatOptions) => {
 
     const initSocket = async () => {
       try {
-        // const authHeaders = await getAuthHeaders();
-
         const newSocket = io(serverUrl, {
           withCredentials: true,
           transports: ["websocket", "polling"],
-          forceNew: true,
+          forceNew: false, // Changed to false to reuse connections
           reconnection: true,
           reconnectionAttempts: maxReconnectAttempts,
           reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
           timeout: 20000,
-          // extraHeaders: authHeaders,
+          // Add connection stability options
+          upgrade: true,
+          rememberUpgrade: true,
         });
 
         // Set up event listeners
@@ -414,13 +446,7 @@ export const useChat = (options: UseChatOptions) => {
     initSocket();
 
     return () => {
-      console.log("🧹 Cleaning up socket connection...");
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.close();
-      }
-      socketRef.current = null;
-      isConnectingRef.current = false;
+      cleanup();
     };
   }, [
     serverUrl,
@@ -437,84 +463,58 @@ export const useChat = (options: UseChatOptions) => {
     handleMessagesRead,
     handleError,
     handleMoreMessages,
+    cleanup,
   ]);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
 
   // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
+    cleanupRef.current = false;
+
     return () => {
       mountedRef.current = false;
       cleanup();
     };
   }, [cleanup]);
 
-  // Enhanced joinChat function
+  // Enhanced joinChat function with stability check
   const joinChat = useCallback(
-    async (otherUserId: string): Promise<void> => {
-      if (!socketRef.current || !isConnected) {
-        throw new Error("Not connected to chat server");
+    (otherUserId: string) => {
+      if (!socketRef.current || !isConnected || cleanupRef.current) {
+        setError("Not connected to chat server");
+        return;
       }
-
       if (!otherUserId?.trim()) {
-        throw new Error("Invalid user ID");
+        setError("Invalid user ID");
+        return;
       }
-
       if (currentChatUser === otherUserId) {
-        return Promise.resolve();
+        return;
       }
-
       console.log("Joining chat with user:", otherUserId);
       setCurrentChatUser(otherUserId);
       setIsLoading(true);
       setMessages([]);
       messageIdsRef.current.clear();
       setError(null);
-
-      return new Promise<void>((resolve, reject) => {
-        if (!mountedRef.current) {
-          reject(new Error("Component unmounted"));
-          return;
+      socketRef.current.emit("join_chat", { otherUserId }, (response: any) => {
+        if (response.error) {
+          console.error("Error joining chat:", response.error);
+          setError(response.error);
+          setIsLoading(false);
+        } else {
+          // Handle the received messages
+          const sortedHistory = response.messages.sort(
+            (a: any, b: any) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          messageIdsRef.current.clear();
+          sortedHistory.forEach((msg: any) => messageIdsRef.current.add(msg.id));
+          setMessages(sortedHistory);
+          setIsLoading(false);
         }
-
-        const timeout = setTimeout(() => {
-          console.log(
-            `⏳ Timeout waiting for chat_history from ${otherUserId}`
-          );
-          setIsLoading(false);
-          resolve(); // Resolve even on timeout for new conversations
-        }, 10000);
-
-        const handleHistoryOnce = (history: Message[]) => {
-          console.log(
-            `✅ Chat history received for ${otherUserId}: ${history.length} messages`
-          );
-          clearTimeout(timeout);
-          socketRef.current?.off("chat_history", handleHistoryOnce);
-          socketRef.current?.off("error", handleErrorOnce);
-          resolve();
-        };
-
-        const handleErrorOnce = (errorData: any) => {
-          console.log(`❌ Error joining chat with ${otherUserId}:`, errorData);
-          clearTimeout(timeout);
-          socketRef.current?.off("chat_history", handleHistoryOnce);
-          socketRef.current?.off("error", handleErrorOnce);
-          setIsLoading(false);
-          reject(new Error(errorData?.message || "Failed to join chat"));
-        };
-
-        socketRef.current?.once("chat_history", handleHistoryOnce);
-        socketRef.current?.once("error", handleErrorOnce);
-        socketRef.current?.emit("join_chat", { otherUserId });
-        console.log(`📤 Emitted join_chat for ${otherUserId}`);
       });
+      console.log(`📤 Emitted join_chat for ${otherUserId}`);
     },
     [isConnected, currentChatUser]
   );
@@ -522,7 +522,7 @@ export const useChat = (options: UseChatOptions) => {
   // Enhanced sendMessage function
   const sendMessage = useCallback(
     async (receiverId: string, content: string): Promise<void> => {
-      if (!socketRef.current || !isConnected) {
+      if (!socketRef.current || !isConnected || cleanupRef.current) {
         throw new Error("Not connected to chat server");
       }
 
@@ -540,13 +540,15 @@ export const useChat = (options: UseChatOptions) => {
       }
 
       return new Promise<void>((resolve, reject) => {
-        if (!mountedRef.current) {
+        if (!mountedRef.current || cleanupRef.current) {
           reject(new Error("Component unmounted"));
           return;
         }
 
         const timeout = setTimeout(() => {
-          reject(new Error("Message send timeout"));
+          if (!cleanupRef.current) {
+            reject(new Error("Message send timeout"));
+          }
         }, 15000);
 
         const handleSentOnce = ({
@@ -556,6 +558,8 @@ export const useChat = (options: UseChatOptions) => {
           messageId: string;
           status: string;
         }) => {
+          if (cleanupRef.current) return;
+
           clearTimeout(timeout);
           socketRef.current?.off("message_sent", handleSentOnce);
           socketRef.current?.off("error", handleErrorOnce);
@@ -568,6 +572,8 @@ export const useChat = (options: UseChatOptions) => {
         };
 
         const handleErrorOnce = (errorData: any) => {
+          if (cleanupRef.current) return;
+
           clearTimeout(timeout);
           socketRef.current?.off("message_sent", handleSentOnce);
           socketRef.current?.off("error", handleErrorOnce);
@@ -585,10 +591,16 @@ export const useChat = (options: UseChatOptions) => {
     [isConnected]
   );
 
-  // Typing functions
+  // Typing functions with cleanup checks
   const startTyping = useCallback(
     (receiverId: string) => {
-      if (!socketRef.current || !isConnected || !receiverId?.trim()) return;
+      if (
+        !socketRef.current ||
+        !isConnected ||
+        !receiverId?.trim() ||
+        cleanupRef.current
+      )
+        return;
 
       socketRef.current.emit("typing_start", { receiverId });
 
@@ -597,7 +609,7 @@ export const useChat = (options: UseChatOptions) => {
       }
 
       typingTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current && socketRef.current) {
+        if (mountedRef.current && socketRef.current && !cleanupRef.current) {
           socketRef.current.emit("typing_stop", { receiverId });
         }
       }, 3000);
@@ -607,7 +619,13 @@ export const useChat = (options: UseChatOptions) => {
 
   const stopTyping = useCallback(
     (receiverId: string) => {
-      if (!socketRef.current || !isConnected || !receiverId?.trim()) return;
+      if (
+        !socketRef.current ||
+        !isConnected ||
+        !receiverId?.trim() ||
+        cleanupRef.current
+      )
+        return;
 
       socketRef.current.emit("typing_stop", { receiverId });
 
@@ -621,7 +639,13 @@ export const useChat = (options: UseChatOptions) => {
 
   const markAsRead = useCallback(
     (senderId: string) => {
-      if (!socketRef.current || !isConnected || !senderId?.trim()) return;
+      if (
+        !socketRef.current ||
+        !isConnected ||
+        !senderId?.trim() ||
+        cleanupRef.current
+      )
+        return;
 
       socketRef.current.emit("mark_read", { senderId });
 
@@ -642,7 +666,7 @@ export const useChat = (options: UseChatOptions) => {
   );
 
   const loadConversations = useCallback(() => {
-    if (!socketRef.current || !isConnected) return;
+    if (!socketRef.current || !isConnected || cleanupRef.current) return;
     console.log("Loading conversations...");
     socketRef.current.emit("get_conversations");
   }, [isConnected]);
@@ -674,7 +698,8 @@ export const useChat = (options: UseChatOptions) => {
     if (
       socketRef.current &&
       !socketRef.current.connected &&
-      !isConnectingRef.current
+      !isConnectingRef.current &&
+      !cleanupRef.current
     ) {
       isConnectingRef.current = true;
       socketRef.current.connect();
@@ -682,7 +707,7 @@ export const useChat = (options: UseChatOptions) => {
   }, []);
 
   const disconnect = useCallback(() => {
-    if (socketRef.current) {
+    if (socketRef.current && !cleanupRef.current) {
       socketRef.current.disconnect();
     }
   }, []);
@@ -716,7 +741,6 @@ export const useChat = (options: UseChatOptions) => {
     // Utilities
     getConversationByUserId,
     messagesEndRef,
-
     isLoadingMore,
     loadMoreMessages,
     messagesContainerRef,
