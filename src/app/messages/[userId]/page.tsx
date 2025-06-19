@@ -3,6 +3,7 @@
 import ChatComponent from "../_components/Chat";
 import { useEffect, useState } from "react";
 import { getSessionData } from "../_utils";
+import { redirect } from "next/navigation";
 
 export default function MessagesPage({
   params,
@@ -25,12 +26,13 @@ export default function MessagesPage({
           throw new Error("User ID is required");
         }
 
-        const user = await getSessionData();
-        if (!user) {
+        const session = await getSessionData();
+        if (!session) {
           throw new Error("User not found");
+          redirect("/auth?mode=signin");
         }
 
-        setCurrUser(user.user);
+        setCurrUser(session.user);
       } catch (err) {
         console.error("Error loading user:", err);
         setError(err instanceof Error ? err.message : "Failed to load user");
@@ -77,5 +79,9 @@ export default function MessagesPage({
     );
   }
 
-  return <ChatComponent currentUser={currUser} />;
+  return (
+    <div className="min-h-screen bg-[#121212]">
+      <ChatComponent currentUser={currUser} />
+    </div>
+  );
 }

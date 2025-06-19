@@ -226,7 +226,9 @@ export const useChat = (options: UseChatOptions) => {
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      setConversations(sortedConvs);
+      if (!currentChatUser) {
+        setConversations(sortedConvs);
+      }
     });
 
     socket.on("unread_count", (count: number) => {
@@ -332,6 +334,10 @@ export const useChat = (options: UseChatOptions) => {
   }, [messages]);
 
   // API methods
+  // Replace the joinChat function in your useChat hook with this fixed version:
+
+  // Replace the existing joinChat function with this fixed version:
+
   const joinChat = useCallback(
     (otherUserId: string) => {
       if (!socketRef.current || !isConnected) {
@@ -372,7 +378,22 @@ export const useChat = (options: UseChatOptions) => {
               setIsLoading(false);
               reject(new Error(response.error));
             } else {
-              const sortedHistory = (response?.messages || []).sort(
+              let messages = [];
+              let otherUser = null;
+
+              if (typeof response === "object" && response !== null) {
+                if (Array.isArray(response.messages)) {
+                  messages = response.messages;
+                }
+                if (response.otherUser) {
+                  otherUser = response.otherUser;
+                }
+              }
+
+              console.log("Processing messages:", messages);
+              console.log("Other user details:", otherUser);
+
+              const sortedHistory = messages.sort(
                 (a: any, b: any) =>
                   new Date(a.createdAt).getTime() -
                   new Date(b.createdAt).getTime()
@@ -384,13 +405,43 @@ export const useChat = (options: UseChatOptions) => {
               );
               setMessages(sortedHistory);
               setIsLoading(false);
+
+              // Add temporary conversation if it doesn't exist
+              if (otherUser) {
+                setConversations((prev) => {
+                  const existingIndex = prev.findIndex(
+                    (conv) => conv.other_user_id === otherUserId
+                  );
+                  if (existingIndex >= 0) {
+                    return prev;
+                  } else {
+                    const newConv = {
+                      id: `temp_${otherUserId}`,
+                      other_user_id: otherUserId,
+                      content: "",
+                      createdAt: new Date().toISOString(),
+                      name: otherUser.name,
+                      username: otherUser.username,
+                      image: otherUser.image,
+                      user_id: currentUserId,
+                      unread_count: 0,
+                    };
+                    return [newConv, ...prev].sort(
+                      (a, b) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                    );
+                  }
+                });
+              }
+
               resolve();
             }
           }
         );
       });
     },
-    [isConnected, currentChatUser]
+    [isConnected, currentChatUser, conversations, currentUserId]
   );
 
   const sendMessage = useCallback(
