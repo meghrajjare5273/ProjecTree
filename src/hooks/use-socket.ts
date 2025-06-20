@@ -45,8 +45,7 @@ interface UseChatOptions {
 
 export const useChat = (options: UseChatOptions) => {
   const {
-    serverUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL ||
-      "http://localhost:3001",
+    serverUrl = process.env.NEXT_PUBLIC_CHAT_SERVER_URL,
     autoConnect = true,
     currentUserId,
   } = options;
