@@ -58,6 +58,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
   } = useChat({
     currentUserId: currentUser.id, // Pass the current user ID
     autoConnect: true,
+    serverUrl: process.env.NEXT_PUBLIC_CHAT_SERVER_URL,
   });
 
   // Component state
