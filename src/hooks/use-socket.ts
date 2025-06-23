@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+import { authClient } from "@/lib/auth-client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
 
@@ -60,6 +61,7 @@ export const useChat = (options: UseChatOptions) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   // Refs
   const socketRef = useRef<Socket | null>(null);
@@ -280,6 +282,17 @@ export const useChat = (options: UseChatOptions) => {
     });
   }, []); // Empty dependency array - these handlers are stable
 
+  useEffect(() => {
+    const fetchToken = async () => {
+      const session = authClient.getSession();
+      const accessToken = (await session).data?.session.token;
+      if (accessToken) {
+        setToken(accessToken);
+      }
+    };
+    fetchToken();
+  }, []);
+
   // Initialize socket connection
   useEffect(() => {
     if (!autoConnect || !currentUserId || initializingRef.current) {
@@ -296,7 +309,8 @@ export const useChat = (options: UseChatOptions) => {
       reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000,
+      timeout: 200000,
+      // auth: { token },
     });
 
     socketRef.current = socket;

@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["@chakra-ui/react"],
   },
   reactStrictMode: false,
+
+  async rewrites() {
+    return [
+      {
+        source: "/ws:path*",
+        destination: "http://localhost:3001/:path*",
+      },
+    ];
+  },
 };
 export default nextConfig;
 
