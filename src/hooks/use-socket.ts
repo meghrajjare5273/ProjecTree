@@ -281,42 +281,42 @@ export const useChat = (options: UseChatOptions) => {
   }, []); // Empty dependency array - these handlers are stable
 
   // Initialize socket connection
-  useEffect(() => {
-    if (!autoConnect || !currentUserId || initializingRef.current) {
-      return;
-    }
+  // useEffect(() => {
+  //   if (!autoConnect || !currentUserId || initializingRef.current) {
+  //     return;
+  //   }
 
-    console.log("🔌 Initializing socket connection for user:", currentUserId);
-    initializingRef.current = true;
+  //   console.log("🔌 Initializing socket connection for user:", currentUserId);
+  //   initializingRef.current = true;
 
-    const socket = io(serverUrl, {
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: maxReconnectAttempts,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-    });
+  //   const socket = io(serverUrl, {
+  //     withCredentials: true,
+  //     transports: ["websocket", "polling"],
+  //     reconnection: true,
+  //     reconnectionAttempts: maxReconnectAttempts,
+  //     reconnectionDelay: 1000,
+  //     reconnectionDelayMax: 5000,
+  //     timeout: 20000,
+  //   });
 
-    socketRef.current = socket;
-    setupSocketListeners(socket);
+  //   socketRef.current = socket;
+  //   setupSocketListeners(socket);
 
-    return () => {
-      console.log("🧹 Cleaning up socket connection...");
-      initializingRef.current = false;
+  //   return () => {
+  //     console.log("🧹 Cleaning up socket connection...");
+  //     initializingRef.current = false;
 
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-      }
+  //     if (typingTimeoutRef.current) {
+  //       clearTimeout(typingTimeoutRef.current);
+  //       typingTimeoutRef.current = null;
+  //     }
 
-      messageIdsRef.current.clear();
-      socket.removeAllListeners();
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [serverUrl, autoConnect, currentUserId, setupSocketListeners]);
+  //     messageIdsRef.current.clear();
+  //     socket.removeAllListeners();
+  //     socket.disconnect();
+  //     socketRef.current = null;
+  //   };
+  // }, [serverUrl, autoConnect, currentUserId, setupSocketListeners]);
 
   // Auto-scroll effect
   useEffect(() => {
@@ -607,11 +607,59 @@ export const useChat = (options: UseChatOptions) => {
 
   const clearError = useCallback(() => setError(null), []);
 
-  const connect = useCallback(() => {
-    if (socketRef.current && !socketRef.current.connected) {
-      socketRef.current.connect();
+  const connect = useCallback(async () => {
+    if (!serverUrl || !currentUserId) {
+      setError("Server URL or user ID missing");
+      return;
     }
-  }, []);
+
+    try {
+      // Fetch WebSocket authentication token
+      const response = await fetch("/api/websocket-token", {
+        credentials: "include", // Send cookies to verify session
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch WebSocket token");
+      }
+      const { token } = await response.json();
+
+      const socket = io(serverUrl, {
+        auth: { token }, // Pass token in auth object
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: maxReconnectAttempts,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+      });
+
+      socketRef.current = socket;
+      setupSocketListeners(socket);
+    } catch (error) {
+      console.error("Failed to initialize socket:", error);
+      setError("Failed to connect to chat server");
+      setIsConnected(false);
+    }
+  }, [serverUrl, currentUserId, maxReconnectAttempts]);
+
+  useEffect(() => {
+    if (!autoConnect || !currentUserId || initializingRef.current) return;
+
+    initializingRef.current = true;
+    connect();
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      initializingRef.current = false;
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      messageIdsRef.current.clear();
+    };
+  }, [connect, autoConnect, currentUserId]);
+
+  // ... (keep existing setupSocketListeners and other functions)
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
