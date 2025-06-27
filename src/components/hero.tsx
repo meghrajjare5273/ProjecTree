@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Image from "next/image";
-import { motion } from "motion/react";
+import { motion, Variants } from "motion/react";
 import Nav from "@/components/nav";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -28,27 +29,26 @@ export default function HeroSection() {
     },
   };
 
-  const fadeIn = {
+  const fadeIn: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.5, ease: "easeOut" },
+      transition: { duration: 0.5, ease: "easeOut" as any },
     },
   };
 
-  const imageVariants = {
+  const imageVariants: Variants = {
     hidden: { opacity: 0, scale: 1.1 },
     visible: {
       opacity: 1,
       scale: 1,
       transition: {
         duration: 1.2,
-        ease: "easeOut",
+        ease: "easeOut" as any,
       },
     },
   };
-
   return (
     <div className="relative min-h-screen bg-white overflow-hidden">
       {/* Darker overlay for better nav visibility */}

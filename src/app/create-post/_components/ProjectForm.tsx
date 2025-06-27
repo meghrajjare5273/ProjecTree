@@ -25,7 +25,7 @@ const projectSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   tags: z.string().optional(),
-  openForCollaboration: z.boolean().default(false),
+  openForCollaboration: z.boolean(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
