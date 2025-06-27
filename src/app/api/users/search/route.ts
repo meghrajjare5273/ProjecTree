@@ -69,7 +69,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Remove email from response for privacy
-    const sanitizedUsers = users.map(({ email, ...user }) => user);
+    const sanitizedUsers = users.map(
+      ({ email, ...user }: { email: string }) => user
+    );
 
     return NextResponse.json(sanitizedUsers);
   } catch (error) {

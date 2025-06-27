@@ -6,7 +6,7 @@ export interface Project {
   id: string;
   title: string;
   description: string;
-  tags: string[];
+  // tags: string[];
   // Add other project fields if needed
 }
 
@@ -15,8 +15,8 @@ export interface Event {
   id: string;
   title: string;
   description: string;
-  location: string;
-  organizer: string;
+  // location: string;
+  // organizer: string;
   // Add other event fields if needed
 }
 
@@ -25,7 +25,7 @@ export interface User {
   id: string;
   username: string | null;
   name: string | null;
-  bio: string | null;
+  // bio: string | null;
   // Add other user fields if needed
 }
 
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     // Format results
     const formattedProjects: ProjectSearchResult[] = projects.map(
-      (project) => ({
+      (project: Project) => ({
         id: project.id,
         title: project.title,
         description: project.description,
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    const formattedEvents: EventSearchResult[] = events.map((event) => ({
+    const formattedEvents: EventSearchResult[] = events.map((event: Event) => ({
       id: event.id,
       title: event.title,
       description: event.description,
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
       url: `/events/${event.id}`,
     }));
 
-    const formattedUsers: UserSearchResult[] = users.map((user) => ({
+    const formattedUsers: UserSearchResult[] = users.map((user: User) => ({
       id: user.id,
       title: user.name || user.username || "Unknown User",
       username: user.username,
