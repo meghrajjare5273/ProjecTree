@@ -4,6 +4,7 @@ import ChatComponent from "../_components/Chat";
 import { useEffect, useState } from "react";
 import { getSessionData } from "../_utils";
 import { redirect } from "next/navigation";
+// import { Metadata } from "next";
 
 export default function MessagesPage({
   params,

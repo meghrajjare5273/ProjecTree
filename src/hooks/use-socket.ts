@@ -18,6 +18,10 @@ export interface Message {
     username: string | null;
     image: string | null;
   };
+  // Add these optional fields for optimistic updates
+  isPending?: boolean;
+  isFailed?: boolean;
+  tempId?: string;
 }
 
 export interface Conversation {
@@ -69,19 +73,84 @@ export const useChat = (options: UseChatOptions) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const reconnectAttemptsRef = useRef(0);
   const initializingRef = useRef(false);
+  const pendingMessagesRef = useRef(new Map<string, Message>());
+  const currentUserRef = useRef(currentUserId);
 
   const maxReconnectAttempts = 5;
 
-  // Stable event handlers - These don't depend on state, preventing re-renders
+  // Generate temporary ID for optimistic updates
+  const generateTempId = useCallback(() => {
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }, []);
+
+  // Create optimistic message
+  const createOptimisticMessage = useCallback(
+    (receiverId: string, content: string): Message => {
+      const tempId = generateTempId();
+      return {
+        id: tempId,
+        tempId,
+        content,
+        senderId: currentUserId,
+        receiverId,
+        createdAt: new Date().toISOString(),
+        read: false,
+        isPending: true,
+        isFailed: false,
+        sender: {
+          id: currentUserId,
+          name: null, // Will be filled from current user data
+          username: null,
+          image: null,
+        },
+      };
+    },
+    [currentUserId, generateTempId]
+  );
+
+  // Remove failed message
+  const removeFailedMessage = useCallback((tempId: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.tempId !== tempId));
+    pendingMessagesRef.current.delete(tempId);
+  }, []);
+
+  // Mark message as failed
+  const markMessageAsFailed = useCallback((tempId: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.tempId === tempId
+          ? { ...msg, isPending: false, isFailed: true }
+          : msg
+      )
+    );
+  }, []);
+
+  // Replace optimistic message with real message
+  const replaceOptimisticMessage = useCallback(
+    (tempId: string, realMessage: Message) => {
+      setMessages((prev) => {
+        const filtered = prev.filter((msg) => msg.tempId !== tempId);
+        const newMessages = [...filtered, realMessage];
+        return newMessages.sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
+      pendingMessagesRef.current.delete(tempId);
+      messageIdsRef.current.add(realMessage.id);
+    },
+    []
+  );
+
+  // Stable event handlers
   const setupSocketListeners = useCallback((socket: Socket) => {
-    // Connection events
+    // Connection events (keep exactly as original)
     socket.on("connect", () => {
       console.log("✅ Connected to chat server");
       setIsConnected(true);
       setError(null);
       reconnectAttemptsRef.current = 0;
 
-      // Load conversations after connection
       setTimeout(() => {
         if (socket.connected) {
           socket.emit("get_conversations");
@@ -95,6 +164,13 @@ export const useChat = (options: UseChatOptions) => {
 
       if (reason !== "io client disconnect" && reason !== "transport close") {
         setError("Connection lost. Attempting to reconnect...");
+
+        // Mark pending messages as failed
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.isPending ? { ...msg, isPending: false, isFailed: true } : msg
+          )
+        );
       }
     });
 
@@ -117,7 +193,6 @@ export const useChat = (options: UseChatOptions) => {
       setIsConnected(true);
       setError(null);
 
-      // Re-join current chat and refresh conversations
       const currentChat = currentChatUser;
       if (currentChat) {
         socket.emit("join_chat", { otherUserId: currentChat });
@@ -125,11 +200,10 @@ export const useChat = (options: UseChatOptions) => {
       socket.emit("get_conversations");
     });
 
-    // Message events
+    // Enhanced new_message handler for optimistic updates
     socket.on("new_message", (message: Message) => {
       console.log("📨 Received new message:", message);
 
-      // Prevent duplicate messages
       if (messageIdsRef.current.has(message.id)) {
         console.log("Duplicate message ignored:", message.id);
         return;
@@ -137,8 +211,31 @@ export const useChat = (options: UseChatOptions) => {
 
       messageIdsRef.current.add(message.id);
 
-      // Update messages if we're in the current chat
       setMessages((prev) => {
+        // Check if this message replaces a pending optimistic message
+        const pendingIndex = prev.findIndex(
+          (msg) =>
+            msg.isPending &&
+            msg.senderId === message.senderId &&
+            msg.receiverId === message.receiverId &&
+            msg.content === message.content &&
+            Math.abs(
+              new Date(msg.createdAt).getTime() -
+                new Date(message.createdAt).getTime()
+            ) < 10000
+        );
+
+        if (pendingIndex >= 0) {
+          // Replace optimistic message with real message
+          const updated = [...prev];
+          updated[pendingIndex] = message;
+          return updated.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        }
+
+        // Add new message normally
         const currentChat = currentChatUser;
         const isInCurrentChat =
           currentChat &&
@@ -155,11 +252,10 @@ export const useChat = (options: UseChatOptions) => {
         return prev;
       });
 
-      // Always update conversations
+      // Update conversations (keep original logic)
       setConversations((prev) => {
-        const isReceived = message.receiverId === currentUserId;
+        const isReceived = message.receiverId === currentUserRef.current;
         const otherUserId = isReceived ? message.senderId : message.receiverId;
-
         const existingIndex = prev.findIndex(
           (conv) => conv.other_user_id === otherUserId
         );
@@ -191,7 +287,7 @@ export const useChat = (options: UseChatOptions) => {
             name: message.sender.name,
             username: message.sender.username,
             image: message.sender.image,
-            user_id: currentUserId,
+            user_id: currentUserRef.current,
             unread_count: currentChatUser !== otherUserId ? 1 : 0,
           };
 
@@ -205,6 +301,28 @@ export const useChat = (options: UseChatOptions) => {
       });
     });
 
+    // Add message_sent handler for optimistic update confirmations
+    socket.on(
+      "message_sent",
+      ({
+        messageId,
+        tempId,
+        status,
+      }: {
+        messageId: string;
+        tempId?: string;
+        status: string;
+      }) => {
+        console.log("✅ Global message sent confirmation:", {
+          messageId,
+          tempId,
+          status,
+        });
+        // Individual message handlers will process this
+      }
+    );
+
+    // Keep all other original event handlers exactly the same
     socket.on("chat_history", (history: Message[]) => {
       console.log("📜 Received chat history:", history.length, "messages");
 
@@ -273,70 +391,27 @@ export const useChat = (options: UseChatOptions) => {
       setIsLoadingMore(false);
     });
 
-    socket.on("error", ({ message }: { message: string }) => {
-      console.error("❌ Socket error:", message);
-      setError(message);
-      setIsLoadingMore(false);
-    });
-  }, []); // Empty dependency array - these handlers are stable
+    socket.on(
+      "error",
+      ({ message, tempId }: { message: string; tempId?: string }) => {
+        console.error("❌ Socket error:", message);
+        setError(message);
+        setIsLoadingMore(false);
 
-  // Initialize socket connection
-  // useEffect(() => {
-  //   if (!autoConnect || !currentUserId || initializingRef.current) {
-  //     return;
-  //   }
-
-  //   console.log("🔌 Initializing socket connection for user:", currentUserId);
-  //   initializingRef.current = true;
-
-  //   const socket = io(serverUrl, {
-  //     withCredentials: true,
-  //     transports: ["websocket", "polling"],
-  //     reconnection: true,
-  //     reconnectionAttempts: maxReconnectAttempts,
-  //     reconnectionDelay: 1000,
-  //     reconnectionDelayMax: 5000,
-  //     timeout: 20000,
-  //   });
-
-  //   socketRef.current = socket;
-  //   setupSocketListeners(socket);
-
-  //   return () => {
-  //     console.log("🧹 Cleaning up socket connection...");
-  //     initializingRef.current = false;
-
-  //     if (typingTimeoutRef.current) {
-  //       clearTimeout(typingTimeoutRef.current);
-  //       typingTimeoutRef.current = null;
-  //     }
-
-  //     messageIdsRef.current.clear();
-  //     socket.removeAllListeners();
-  //     socket.disconnect();
-  //     socketRef.current = null;
-  //   };
-  // }, [serverUrl, autoConnect, currentUserId, setupSocketListeners]);
-
-  // Auto-scroll effect
-  useEffect(() => {
-    if (messagesEndRef.current && messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      const isAtBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight <
-        100;
-
-      if (isAtBottom) {
-        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        if (tempId) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.tempId === tempId
+                ? { ...msg, isPending: false, isFailed: true }
+                : msg
+            )
+          );
+        }
       }
-    }
-  }, [messages]);
+    );
+  }, []); // Empty dependency array to keep it stable
 
-  // API methods
-  // Replace the joinChat function in your useChat hook with this fixed version:
-
-  // Replace the existing joinChat function with this fixed version:
-
+  // Join chat function
   const joinChat = useCallback(
     (otherUserId: string) => {
       if (!socketRef.current || !isConnected) {
@@ -358,6 +433,7 @@ export const useChat = (options: UseChatOptions) => {
       setIsLoading(true);
       setMessages([]);
       messageIdsRef.current.clear();
+      pendingMessagesRef.current.clear();
       setError(null);
 
       return new Promise<void>((resolve, reject) => {
@@ -440,9 +516,10 @@ export const useChat = (options: UseChatOptions) => {
         );
       });
     },
-    [isConnected, currentChatUser, conversations, currentUserId]
+    [isConnected, currentChatUser, currentUserId]
   );
 
+  // Enhanced sendMessage with optimistic updates - FIXED
   const sendMessage = useCallback(
     async (receiverId: string, content: string): Promise<void> => {
       if (!socketRef.current || !isConnected) {
@@ -462,45 +539,196 @@ export const useChat = (options: UseChatOptions) => {
         throw new Error("Invalid receiver ID");
       }
 
+      // Create optimistic message
+      const tempId = `temp_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        tempId,
+        content: trimmedContent,
+        senderId: currentUserId,
+        receiverId,
+        createdAt: new Date().toISOString(),
+        read: false,
+        isPending: true,
+        isFailed: false,
+        sender: {
+          id: currentUserId,
+          name: null,
+          username: null,
+          image: null,
+        },
+      };
+
+      // Add optimistic message immediately
+      setMessages((prev) => {
+        const newMessages = [...prev, optimisticMessage];
+        return newMessages.sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
+
+      // Update conversation optimistically
+      setConversations((prev) => {
+        const existingIndex = prev.findIndex(
+          (conv) => conv.other_user_id === receiverId
+        );
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            content: trimmedContent,
+            createdAt: optimisticMessage.createdAt,
+          };
+          return updated.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        }
+        return prev;
+      });
+
+      // Send to server
       return new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.tempId === tempId
+                ? { ...msg, isPending: false, isFailed: true }
+                : msg
+            )
+          );
           reject(new Error("Message send timeout"));
         }, 15000);
 
-        const handleSent = ({
-          messageId,
-          status,
-        }: {
-          messageId: string;
-          status: string;
-        }) => {
+        // Track if we've already resolved/rejected to prevent multiple calls
+        let isSettled = false;
+
+        const cleanup = () => {
           clearTimeout(timeout);
           socketRef.current?.off("message_sent", handleSent);
           socketRef.current?.off("error", handleError);
+          socketRef.current?.off("new_message", handleNewMessage);
+        };
 
-          if (status === "delivered") {
+        const settlePromise = (success: boolean, error?: string) => {
+          if (isSettled) return;
+          isSettled = true;
+          cleanup();
+
+          if (success) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.tempId === tempId ? { ...msg, isPending: false } : msg
+              )
+            );
             resolve();
           } else {
-            reject(new Error(`Failed to send message: ${status}`));
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.tempId === tempId
+                  ? { ...msg, isPending: false, isFailed: true }
+                  : msg
+              )
+            );
+            reject(new Error(error || "Failed to send message"));
+          }
+        };
+
+        const handleSent = ({
+          messageId,
+          tempId: responseTempId,
+          status,
+        }: {
+          messageId: string;
+          tempId?: string;
+          status: string;
+        }) => {
+          console.log("Message sent confirmation received:", {
+            messageId,
+            tempId: responseTempId,
+            status,
+            expectedTempId: tempId,
+          });
+
+          // Handle case where server doesn't send back tempId
+          // We'll also listen for new_message as a backup
+          if (responseTempId && responseTempId !== tempId) return;
+
+          if (status === "delivered" || status === "success") {
+            settlePromise(true);
+          } else {
+            settlePromise(false, `Failed to send message: ${status}`);
+          }
+        };
+
+        const handleNewMessage = (message: any) => {
+          // Check if this new message corresponds to our sent message
+          if (
+            message.senderId === currentUserId &&
+            message.receiverId === receiverId &&
+            message.content === trimmedContent
+          ) {
+            console.log(
+              "Confirming message delivery via new_message event:",
+              message
+            );
+            settlePromise(true);
           }
         };
 
         const handleError = (errorData: any) => {
-          clearTimeout(timeout);
-          socketRef.current?.off("message_sent", handleSent);
-          socketRef.current?.off("error", handleError);
-          reject(new Error(errorData?.message || "Failed to send message"));
+          console.error("Message send error:", errorData);
+
+          // Only handle errors for our specific message or general errors
+          if (errorData.tempId && errorData.tempId !== tempId) return;
+
+          settlePromise(false, errorData?.message || "Failed to send message");
         };
 
-        socketRef.current?.once("message_sent", handleSent);
-        socketRef.current?.once("error", handleError);
+        // Set up listeners
+        socketRef.current?.on("message_sent", handleSent);
+        socketRef.current?.on("error", handleError);
+        socketRef.current?.on("new_message", handleNewMessage);
+
+        console.log("Sending message to server:", {
+          receiverId,
+          content: trimmedContent,
+          tempId,
+        });
+
         socketRef.current?.emit("send_message", {
           receiverId,
           content: trimmedContent,
+          tempId,
         });
       });
     },
-    [isConnected]
+    [isConnected, currentUserId]
+  );
+
+  const retryMessage = useCallback(
+    async (message: Message) => {
+      if (!message.tempId || !message.isFailed) return;
+
+      // Reset message state
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.tempId === message.tempId
+            ? { ...msg, isPending: true, isFailed: false }
+            : msg
+        )
+      );
+
+      try {
+        await sendMessage(message.receiverId, message.content);
+      } catch (error) {
+        console.error("Failed to retry message:", error);
+      }
+    },
+    [sendMessage]
   );
 
   const loadMoreMessages = useCallback(() => {
@@ -592,6 +820,7 @@ export const useChat = (options: UseChatOptions) => {
     setCurrentChatUser(null);
     setMessages([]);
     messageIdsRef.current.clear();
+    pendingMessagesRef.current.clear(); // Clear pending messages
     setIsLoading(false);
     setError(null);
     setTypingUsers(new Set());
@@ -616,7 +845,7 @@ export const useChat = (options: UseChatOptions) => {
     try {
       // Fetch WebSocket authentication token
       const response = await fetch("/api/websocket-token", {
-        credentials: "include", // Send cookies to verify session
+        credentials: "include",
       });
       if (!response.ok) {
         throw new Error("Failed to fetch WebSocket token");
@@ -624,7 +853,7 @@ export const useChat = (options: UseChatOptions) => {
       const { token } = await response.json();
 
       const socket = io(serverUrl, {
-        auth: { token }, // Pass token in auth object
+        auth: { token },
         transports: ["websocket", "polling"],
         reconnection: true,
         reconnectionAttempts: maxReconnectAttempts,
@@ -640,7 +869,11 @@ export const useChat = (options: UseChatOptions) => {
       setError("Failed to connect to chat server");
       setIsConnected(false);
     }
-  }, [serverUrl, currentUserId, maxReconnectAttempts]);
+  }, [serverUrl, currentUserId, setupSocketListeners]);
+
+  useEffect(() => {
+    currentUserRef.current = currentUserId;
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!autoConnect || !currentUserId || initializingRef.current) return;
@@ -656,10 +889,23 @@ export const useChat = (options: UseChatOptions) => {
       initializingRef.current = false;
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       messageIdsRef.current.clear();
+      pendingMessagesRef.current.clear();
     };
   }, [connect, autoConnect, currentUserId]);
 
-  // ... (keep existing setupSocketListeners and other functions)
+  // Auto-scroll effect
+  useEffect(() => {
+    if (messagesEndRef.current && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const isAtBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        100;
+
+      if (isAtBottom) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [messages]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
@@ -687,6 +933,7 @@ export const useChat = (options: UseChatOptions) => {
     joinChat,
     leaveChat,
     sendMessage,
+    retryMessage,
     startTyping,
     stopTyping,
     markAsRead,

@@ -8,10 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search } from "lucide-react";
+import { Search, AlertCircle, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-// import Link from "next/link";
 
 interface ChatComponentProps {
   currentUser: {
@@ -21,7 +19,7 @@ interface ChatComponentProps {
     emailVerified: boolean;
     createdAt: Date;
     updatedAt: Date;
-    image?: string | null | undefined | undefined;
+    image?: string | null | undefined;
     username?: string | null | undefined;
     displayUsername?: string | undefined;
   };
@@ -45,6 +43,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     joinChat,
     leaveChat,
     sendMessage,
+    retryMessage,
     startTyping,
     stopTyping,
     markAsRead,
@@ -56,7 +55,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     loadMoreMessages,
     messagesContainerRef,
   } = useChat({
-    currentUserId: currentUser.id, // Pass the current user ID
+    currentUserId: currentUser.id,
     autoConnect: true,
     serverUrl: process.env.NEXT_PUBLIC_CHAT_SERVER_URL,
   });
@@ -82,7 +81,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       console.log("Connected - loading conversations...");
       const timer = setTimeout(() => {
         loadConversations();
-      }, 1000); // Add delay to ensure connection is stable
+      }, 1000);
 
       return () => clearTimeout(timer);
     }
@@ -92,23 +91,19 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
   useEffect(() => {
     if (!currentChatUser || !isConnected || !mountedRef.current) return;
 
-    // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
 
     if (messageInput.length > 0) {
-      // Start typing
       startTyping(currentChatUser);
 
-      // Stop typing after 2 seconds of no input
       typingTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current) {
           stopTyping(currentChatUser);
         }
       }, 2000);
     } else {
-      // Stop typing immediately when input is cleared
       stopTyping(currentChatUser);
     }
 
@@ -141,12 +136,10 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
         return;
       }
 
-      // Clear existing timeout
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
 
-      // Debounce search requests
       searchTimeoutRef.current = setTimeout(async () => {
         if (!mountedRef.current) return;
 
@@ -154,7 +147,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
           const response = await fetch(
             `/api/users/search?q=${encodeURIComponent(query)}`,
             {
-              credentials: "include", // Include cookies for authentication
+              credentials: "include",
             }
           );
 
@@ -199,26 +192,21 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
       clearError();
 
       try {
-        // Leave current chat first if exists
         if (currentChatUser) {
           await leaveChat();
-          // Small delay to ensure cleanup
           await new Promise((resolve) => setTimeout(resolve, 200));
         }
 
         if (!mountedRef.current) return;
 
-        // Join new chat
         await joinChat(userId);
 
         if (!mountedRef.current) return;
 
-        // Close search interface
         setShowUserSearch(false);
         setSearchQuery("");
         setSearchResults([]);
 
-        // Focus message input
         setTimeout(() => {
           if (mountedRef.current) {
             messageInputRef.current?.focus();
@@ -246,7 +234,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     ]
   );
 
-  // Enhanced message sending with better error handling
+  // Enhanced message sending with optimistic updates
   const handleSendMessage = useCallback(async () => {
     if (
       !messageInput.trim() ||
@@ -265,6 +253,7 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     clearError();
 
     try {
+      // The sendMessage function now handles optimistic updates internally
       await sendMessage(currentChatUser, messageContent);
 
       // Stop typing indicator
@@ -294,6 +283,21 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
     stopTyping,
     clearError,
   ]);
+
+  // Handle retry failed message
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleRetryMessage = useCallback(
+    async (message: any) => {
+      if (!message.isFailed || !retryMessage) return;
+
+      try {
+        await retryMessage(message);
+      } catch (error) {
+        console.error("Failed to retry message:", error);
+      }
+    },
+    [retryMessage]
+  );
 
   // Add scroll event listener to load more messages
   useEffect(() => {
@@ -388,10 +392,8 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
   const handleRetryConnection = useCallback(() => {
     setLocalError(null);
     clearError();
-    window.location.reload(); // Simple retry by reloading
+    window.location.reload();
   }, [clearError]);
-
-  // Replace the main return statement with this modernized version:
 
   return (
     <div className={`flex h-screen bg-background ${className}`}>
@@ -540,7 +542,8 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                     <AvatarImage
                       src={
                         conversation.image ||
-                        "/placeholder.svg?height=48&width=48"
+                        "/placeholder.svg?height=48&width=48" ||
+                        "/placeholder.svg"
                       }
                       alt={conversation.name || conversation.username || "User"}
                     />
@@ -635,7 +638,8 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                         <AvatarImage
                           src={
                             currentChatUserInfo.image ||
-                            "/placeholder.svg?height=40&width=40"
+                            "/placeholder.svg?height=40&width=40" ||
+                            "/placeholder.svg"
                           }
                           alt={
                             currentChatUserInfo.name ||
@@ -743,15 +747,17 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                     const isMyMessage = message.senderId === currentUser.id;
                     return (
                       <div
-                        key={message.id}
+                        key={message.id || message.tempId}
                         className={`flex ${
                           isMyMessage ? "justify-end" : "justify-start"
                         } mb-4`}
                       >
                         <div
-                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm relative ${
                             isMyMessage
-                              ? "bg-[#ffcc00] text-black rounded-br-md"
+                              ? message.isFailed
+                                ? "bg-red-100 text-red-800 border border-red-300 rounded-br-md"
+                                : "bg-[#ffcc00] text-black rounded-br-md"
                               : "bg-card text-foreground border border-border rounded-bl-md"
                           }`}
                         >
@@ -761,43 +767,69 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
                           <div
                             className={`flex items-center justify-between mt-2 text-xs ${
                               isMyMessage
-                                ? "text-black/70"
+                                ? message.isFailed
+                                  ? "text-red-600"
+                                  : "text-black/70"
                                 : "text-muted-foreground"
                             }`}
                           >
                             <span>{formatMessageTime(message.createdAt)}</span>
-                            {isMyMessage && (
-                              <span className="ml-2 flex items-center">
-                                {message.read ? (
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5 13l4 4L19 7"
-                                    />
-                                  </svg>
-                                )}
-                              </span>
-                            )}
+                            <div className="flex items-center ml-2">
+                              {isMyMessage && (
+                                <>
+                                  {message.isPending && (
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-current mr-1" />
+                                  )}
+                                  {message.isFailed ? (
+                                    <Button
+                                      onClick={() =>
+                                        retryMessage && retryMessage(message)
+                                      }
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-auto p-0 text-red-600 hover:text-red-800"
+                                      title="Retry sending message"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                    </Button>
+                                  ) : message.read ? (
+                                    <svg
+                                      className="w-3 h-3"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    !message.isPending && (
+                                      <svg
+                                        className="w-3 h-3"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                    )
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
+                          {message.isFailed && (
+                            <div className="absolute -bottom-1 -right-1">
+                              <AlertCircle className="w-4 h-4 text-red-500" />
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
