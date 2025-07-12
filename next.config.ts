@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ["@chakra-ui/react"],
+    optimizePackageImports: ["@chakra-ui/react", "@material/mui"],
   },
   reactStrictMode: false,
 };

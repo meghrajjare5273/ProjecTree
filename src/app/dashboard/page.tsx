@@ -32,6 +32,8 @@ const Navbar = dynamic(() => import("./_components/Navbar"), { ssr: false });
 const fetcher = (url: string) =>
   fetch(url, { credentials: "include" }).then((res) => res.json());
 
+// export const revalidate = 3600;
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);

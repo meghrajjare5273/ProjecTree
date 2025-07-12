@@ -103,5 +103,10 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ user }, { status: 200 });
+  return NextResponse.json(
+    { user },
+    {
+      headers: { "Cache-Control": "public, max-age=300" },
+    }
+  );
 }

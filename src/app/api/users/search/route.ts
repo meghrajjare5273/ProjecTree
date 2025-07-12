@@ -1,159 +1,217 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// app/api/users/search/route.ts (for App Router) or pages/api/users/search.ts (for Pages Router)
+// app/api/users/search/route.ts
+import { prisma } from "@/lib/prisma";
+import { type NextRequest, NextResponse } from "next/server";
+import { CacheUtils, dbCache } from "@/lib/cache-utils";
+import { CacheConfigs } from "@/lib/cache";
 
-import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { auth } from "@/lib/auth"; // Adjust import path based on your auth setup
+// Your existing types...
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+}
 
-const prisma = new PrismaClient();
+export interface Event {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  organizer: string;
+}
+
+export interface User {
+  id: string;
+  username: string | null;
+  name: string | null;
+  bio: string | null;
+}
+
+export type SearchResultType = "project" | "event" | "user";
+
+export interface BaseSearchResult {
+  id: string;
+  title: string;
+  type: SearchResultType;
+  url: string;
+}
+
+export interface ProjectSearchResult extends BaseSearchResult {
+  type: "project";
+  description: string;
+}
+
+export interface EventSearchResult extends BaseSearchResult {
+  type: "event";
+  description: string;
+}
+
+export interface UserSearchResult extends BaseSearchResult {
+  type: "user";
+  username: string | null;
+}
+
+export type SearchResult =
+  | ProjectSearchResult
+  | EventSearchResult
+  | UserSearchResult;
+
+export interface SearchResponse {
+  results: SearchResult[];
+  error?: string;
+}
+
+// Cached search functions
+async function searchProjects(query: string): Promise<ProjectSearchResult[]> {
+  const cacheKey = CacheUtils.generateKey.withPrefix(
+    "search:projects",
+    query.toLowerCase()
+  );
+
+  const projects = await dbCache.query(
+    cacheKey,
+    () =>
+      prisma.project.findMany({
+        where: {
+          OR: [
+            { title: { contains: query, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+            { tags: { has: query } },
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+        },
+        take: 5,
+      }),
+    CacheConfigs.MEDIUM.ttl
+  );
+
+  return (projects as Project[]).map((project: Project) => ({
+    id: project.id,
+    title: project.title,
+    description: project.description,
+    type: "project" as const,
+    url: `/projects/${project.id}`,
+  }));
+}
+
+async function searchEvents(query: string): Promise<EventSearchResult[]> {
+  const cacheKey = CacheUtils.generateKey.withPrefix(
+    "search:events",
+    query.toLowerCase()
+  );
+
+  const events = await dbCache.query(
+    cacheKey,
+    () =>
+      prisma.event.findMany({
+        where: {
+          OR: [
+            { title: { contains: query, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+            { location: { contains: query, mode: "insensitive" } },
+            { organizer: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+        },
+        take: 5,
+      }),
+    CacheConfigs.MEDIUM.ttl
+  );
+
+  return (events as Event[]).map((event: Event) => ({
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    type: "event" as const,
+    url: `/events/${event.id}`,
+  }));
+}
+
+async function searchUsers(query: string): Promise<UserSearchResult[]> {
+  const cacheKey = CacheUtils.generateKey.withPrefix(
+    "search:users",
+    query.toLowerCase()
+  );
+
+  const users = await dbCache.query(
+    cacheKey,
+    () =>
+      prisma.user.findMany({
+        where: {
+          OR: [
+            { username: { contains: query, mode: "insensitive" } },
+            { name: { contains: query, mode: "insensitive" } },
+            { bio: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+        },
+        take: 5,
+      }),
+    CacheConfigs.MEDIUM.ttl
+  );
+
+  return (users as User[]).map((user: User) => ({
+    id: user.id,
+    title: user.name || user.username || "Unknown User",
+    username: user.username,
+    type: "user" as const,
+    url: `/users/${user.username}`,
+  }));
+}
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("q");
+
+  if (!query || query.length < 2) {
+    return NextResponse.json({ results: [] } as SearchResponse);
+  }
+
   try {
-    // Get the current user session
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q");
-
-    if (!query || query.trim().length < 2) {
-      return NextResponse.json([]);
-    }
-
-    // Search users by name, username, or email
-    const users = await prisma.user.findMany({
-      where: {
-        AND: [
-          {
-            id: {
-              not: session.user.id, // Exclude current user
-            },
-          },
-          {
-            OR: [
-              {
-                name: {
-                  contains: query,
-                  mode: "insensitive",
-                },
-              },
-              {
-                username: {
-                  contains: query,
-                  mode: "insensitive",
-                },
-              },
-              {
-                email: {
-                  contains: query,
-                  mode: "insensitive",
-                },
-              },
-            ],
-          },
-        ],
-      },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        image: true,
-        email: true, // Only include email for search purposes, don't expose in frontend
-      },
-      take: 10, // Limit results
-    });
-
-    // Remove email from response for privacy
-    const sanitizedUsers = users.map(({ email, ...user }) => user);
-
-    return NextResponse.json(sanitizedUsers);
-  } catch (error) {
-    console.error("Error searching users:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    // Use cache wrapper for the entire search operation
+    const cacheKey = CacheUtils.generateKey.withPrefix(
+      "search:all",
+      query.toLowerCase()
     );
-  }
-}
 
-// For Pages Router, use this instead:
-/*
-import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-import { auth } from '@/lib/auth';
+    const results = await CacheUtils.withCache(
+      "search",
+      cacheKey,
+      async () => {
+        // Execute all searches in parallel
+        const [projects, events, users] = await Promise.all([
+          searchProjects(query),
+          searchEvents(query),
+          searchUsers(query),
+        ]);
 
-const prisma = new PrismaClient();
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const session = await auth.api.getSession({
-      headers: req.headers as any,
-    });
-
-    if (!session?.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { q: query } = req.query;
-
-    if (!query || typeof query !== 'string' || query.trim().length < 2) {
-      return res.json([]);
-    }
-
-    const users = await prisma.user.findMany({
-      where: {
-        AND: [
-          {
-            id: {
-              not: session.user.id
-            }
-          },
-          {
-            OR: [
-              {
-                name: {
-                  contains: query,
-                  mode: 'insensitive'
-                }
-              },
-              {
-                username: {
-                  contains: query,
-                  mode: 'insensitive'
-                }
-              },
-              {
-                email: {
-                  contains: query,
-                  mode: 'insensitive'
-                }
-              }
-            ]
-          }
-        ]
+        return [...projects, ...events, ...users];
       },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        image: true
-      },
-      take: 10
-    });
+      CacheConfigs.MEDIUM.ttl
+    );
 
-    res.json(users);
+    return NextResponse.json({ results } as SearchResponse, {
+      headers: {
+        "Cache-Control": "public, max-age=300",
+        "X-Cache-Status": "processed",
+      },
+    });
   } catch (error) {
-    console.error('Error searching users:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Search error:", error);
+    return NextResponse.json({ error: "Search failed" } as SearchResponse, {
+      status: 500,
+    });
   }
 }
-*/

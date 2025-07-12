@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     // Format results
     const formattedProjects: ProjectSearchResult[] = projects.map(
-      (project) => ({
+      (project: Project) => ({
         id: project.id,
         title: project.title,
         description: project.description,
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    const formattedEvents: EventSearchResult[] = events.map((event) => ({
+    const formattedEvents: EventSearchResult[] = events.map((event: Event) => ({
       id: event.id,
       title: event.title,
       description: event.description,
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
       url: `/events/${event.id}`,
     }));
 
-    const formattedUsers: UserSearchResult[] = users.map((user) => ({
+    const formattedUsers: UserSearchResult[] = users.map((user: User) => ({
       id: user.id,
       title: user.name || user.username || "Unknown User",
       username: user.username,
@@ -160,7 +160,9 @@ export async function GET(request: NextRequest) {
       ...formattedUsers,
     ];
 
-    return NextResponse.json({ results } as SearchResponse);
+    return NextResponse.json({ results } as SearchResponse, {
+      headers: { "Cache-Control": "public, max-age=300" },
+    });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json({ error: "Search failed" } as SearchResponse, {
