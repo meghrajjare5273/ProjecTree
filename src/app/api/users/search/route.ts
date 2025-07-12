@@ -9,7 +9,7 @@ export interface Project {
   id: string;
   title: string;
   description: string;
-  tags: string[];
+  tags: string[] | null;
 }
 
 export interface Event {
