@@ -9,7 +9,7 @@ export interface Project {
   id: string;
   title: string;
   description: string;
-  tags: string[] | null;
+  tags: string[] | null | undefined;
 }
 
 export interface Event {
@@ -83,6 +83,7 @@ async function searchProjects(query: string): Promise<ProjectSearchResult[]> {
           id: true,
           title: true,
           description: true,
+          tags: true,
         },
         take: 5,
       }),

@@ -15,8 +15,8 @@ export interface Event {
   id: string;
   title: string;
   description: string;
-  location: string;
-  organizer: string;
+  location: string | null;
+  organizer: string | null;
   // Add other event fields if needed
 }
 
@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
         id: true,
         title: true,
         description: true,
+        tags: true,
       },
       take: 5,
     });
@@ -105,6 +106,8 @@ export async function GET(request: NextRequest) {
         id: true,
         title: true,
         description: true,
+        location: true,
+        organizer: true,
       },
       take: 5,
     });
@@ -122,6 +125,7 @@ export async function GET(request: NextRequest) {
         id: true,
         username: true,
         name: true,
+        bio: true,
       },
       take: 5,
     });
