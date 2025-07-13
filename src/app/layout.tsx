@@ -46,12 +46,6 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />
-        {/* <link
-          rel="preload"
-          as="image"
-          href="/pexels-buro-millennial-636760-1438072.webp"
-        /> */}
-        {/* <link rel="preconnect" as="" href="/api/auth" /> */}
         <meta name="theme-color" content="#000000" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 
@@ -60,7 +54,7 @@ export default function RootLayout({
         <link
           rel="preload"
           as="image"
-          href="/pexels-buro-millennial-636760-1438072.webp"
+          href="/landing.webp"
         />
         <link
           rel="preconnect"

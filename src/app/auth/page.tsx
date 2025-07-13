@@ -143,7 +143,7 @@ export default function AuthPage() {
       {/* Background Image with Gradient */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/pexels-enginakyurt-2943603.jpg"
+          src="/auth.webp"
           alt="Background"
           fill
           className={`object-cover transition-opacity duration-700 ${

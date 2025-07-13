@@ -247,7 +247,7 @@ export default function CompleteProfilePage() {
       <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <Image
-            src="/pexels-enginakyurt-2943603.jpg"
+            src="/auth.webp"
             alt="Background"
             fill
             className="object-cover"
@@ -284,7 +284,7 @@ export default function CompleteProfilePage() {
       {/* Background Image with Gradient */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/pexels-enginakyurt-2943603.jpg"
+          src="/auth.webp"
           alt="Background"
           fill
           className="object-cover"

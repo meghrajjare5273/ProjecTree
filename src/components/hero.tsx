@@ -69,7 +69,7 @@ export default function HeroSection() {
           variants={imageVariants}
         >
           <Image
-            src="/pexels-buro-millennial-636760-1438072.webp"
+            src="/landing.webp"
             alt="Educational concept"
             fill
             className="object-cover"
