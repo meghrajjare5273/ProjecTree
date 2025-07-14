@@ -5,17 +5,20 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import {
-  Grid,
-  LayoutList,
+  Filter,
   Heart,
   MessageSquare,
   Bookmark,
-  CalendarDays,
+  Calendar,
+  Clock,
+  Grid,
+  List,
   MapPin,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 
 interface Post {
   id: string;
@@ -34,21 +37,20 @@ interface Post {
   };
 }
 
-interface ProfileContentProps {
+interface ProfileMainContentProps {
   posts: Post[];
   username: string;
 }
 
-export default function ProfileContent({
+export default function ProfileMainContent({
   posts,
   username,
-}: ProfileContentProps) {
+}: ProfileMainContentProps) {
   const [activeTab, setActiveTab] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [savedPosts, setSavedPosts] = useState<string[]>([]);
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
 
-  // Toggle save post
   const handleSavePost = (postId: string) => {
     setSavedPosts((prev) =>
       prev.includes(postId)
@@ -57,7 +59,6 @@ export default function ProfileContent({
     );
   };
 
-  // Toggle like post
   const handleLikePost = (postId: string) => {
     setLikedPosts((prev) =>
       prev.includes(postId)
@@ -66,14 +67,17 @@ export default function ProfileContent({
     );
   };
 
-  // Format date safely to prevent hydration issues
   const formatDate = (dateString: string) => {
-    // Use a stable date format for SSR consistency
-    const date = new Date(dateString);
-    return formatDistanceToNow(date, { addSuffix: true });
+    return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   };
 
-  // Filter posts based on tab
+  const getPostImage = (post: Post) => {
+    if (Array.isArray(post.images) && post.images.length > 0) {
+      return post.images[0];
+    }
+    return "/placeholder.svg?height=256&width=512";
+  };
+
   const filteredPosts = useMemo(() => {
     if (activeTab === "all") return posts;
     if (activeTab === "projects")
@@ -84,113 +88,255 @@ export default function ProfileContent({
   }, [posts, activeTab]);
 
   return (
-    <div className="bg-[#1a1a1a]/80 backdrop-blur-sm rounded-xl border border-[#333333] overflow-hidden">
-      <div className="flex justify-between items-center border-b border-[#333333] px-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-transparent border-b-0 p-0">
-            <TabsTrigger
-              value="all"
-              className={`px-4 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#ffcc00] data-[state=active]:text-white data-[state=active]:bg-transparent text-gray-400`}
-            >
-              All Posts
-            </TabsTrigger>
-            <TabsTrigger
-              value="projects"
-              className={`px-4 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#ffcc00] data-[state=active]:text-white data-[state=active]:bg-transparent text-gray-400`}
-            >
-              Projects
-            </TabsTrigger>
-            <TabsTrigger
-              value="events"
-              className={`px-4 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#ffcc00] data-[state=active]:text-white data-[state=active]:bg-transparent text-gray-400`}
-            >
-              Events
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`text-gray-400 hover:text-white ${
-              viewMode === "grid" ? "text-[#ffcc00]" : ""
+    <div className="flex-1 order-2 md:order-1">
+      {/* Tabs */}
+      <div className="bg-[#1a1a1a] rounded-lg mb-6 overflow-hidden">
+        <div className="flex overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`px-4 py-3 flex-1 flex justify-center items-center ${
+              activeTab === "all"
+                ? "border-b-2 border-[#ffcc00] text-white"
+                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
             }`}
-            onClick={() => setViewMode("grid")}
           >
-            <Grid className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`text-gray-400 hover:text-white ${
-              viewMode === "list" ? "text-[#ffcc00]" : ""
+            <span>All Posts</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("projects")}
+            className={`px-4 py-3 flex-1 flex justify-center items-center ${
+              activeTab === "projects"
+                ? "border-b-2 border-[#ffcc00] text-white"
+                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
             }`}
-            onClick={() => setViewMode("list")}
           >
-            <LayoutList className="w-4 h-4" />
-          </Button>
+            <span>Projects</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("events")}
+            className={`px-4 py-3 flex-1 flex justify-center items-center ${
+              activeTab === "events"
+                ? "border-b-2 border-[#ffcc00] text-white"
+                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
+            }`}
+          >
+            <span>Events</span>
+          </button>
         </div>
       </div>
 
-      {/* Posts */}
-      <div className="p-4">
-        {filteredPosts.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-400">
-              {username} hasn&apos;t posted any{" "}
-              {activeTab === "projects"
-                ? "projects"
-                : activeTab === "events"
-                ? "events"
-                : "content"}{" "}
-              yet.
-            </p>
+      {/* Filter Bar */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="text-white font-medium">
+          {filteredPosts.length} {activeTab === "all" ? "Posts" : activeTab}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-[#333333] text-gray-300 hover:bg-[#252525] hover:text-white bg-transparent"
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Filter
+          </Button>
+          <div className="flex border border-[#333333] rounded-md">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`p-2 rounded-none border-r border-[#333333] ${
+                viewMode === "list"
+                  ? "text-[#ffcc00] bg-[#252525]"
+                  : "text-gray-400"
+              }`}
+              onClick={() => setViewMode("list")}
+            >
+              <List className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`p-2 rounded-none ${
+                viewMode === "grid"
+                  ? "text-[#ffcc00] bg-[#252525]"
+                  : "text-gray-400"
+              }`}
+              onClick={() => setViewMode("grid")}
+            >
+              <Grid className="w-4 h-4" />
+            </Button>
           </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPosts.map((post) => (
-              <div
-                key={post.id}
-                className="bg-[#252525]/90 backdrop-blur-sm rounded-lg overflow-hidden border border-[#333333] hover:border-[#444444] transition-all duration-200"
-              >
-                {post.images && post.images.length > 0 ? (
-                  <div className="relative h-40 w-full">
-                    <Image
-                      src={
-                        post.images[0] ||
-                        "/placeholder.svg?height=160&width=320" ||
-                        "/placeholder.svg"
-                      }
-                      alt={post.title}
-                      fill
-                      className="object-cover w-full h-full"
-                    />
-                    <Badge className="absolute top-2 right-2 bg-[#ffcc00] text-black text-xs font-bold">
-                      {post.type}
-                    </Badge>
-                  </div>
-                ) : (
-                  <div className="h-20 bg-gradient-to-r from-[#333333] to-[#252525] flex items-center justify-center">
-                    <Badge className="bg-[#ffcc00] text-black text-xs font-bold">
-                      {post.type}
-                    </Badge>
+        </div>
+      </div>
+
+      {/* Content */}
+      {filteredPosts.length === 0 ? (
+        <Card className="bg-[#1a1a1a] border-[#333333] p-6 text-center">
+          <h3 className="text-xl font-semibold text-white">No Posts Found</h3>
+          <p className="text-gray-400 mt-2">
+            {username} hasn&apos;t shared any{" "}
+            {activeTab === "projects"
+              ? "projects"
+              : activeTab === "events"
+              ? "events"
+              : "content"}{" "}
+            yet.
+          </p>
+        </Card>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPosts.map((post) => (
+            <Card
+              key={post.id}
+              className="bg-[#1a1a1a] border-[#333333] overflow-hidden hover:border-[#444444] transition-colors"
+            >
+              {post.images && post.images.length > 0 && (
+                <div className="relative h-40 w-full">
+                  <Image
+                    src={getPostImage(post) || "/placeholder.svg"}
+                    alt={post.title}
+                    fill
+                    className="object-cover"
+                  />
+                  <Badge className="absolute top-2 right-2 bg-[#ffcc00] text-black text-xs">
+                    {post.type}
+                  </Badge>
+                </div>
+              )}
+              <CardContent className="p-4">
+                <Link href={`/${post.type}s/${post.id}`}>
+                  <h3 className="text-white font-semibold mb-2 hover:text-[#ffcc00] transition-colors line-clamp-2">
+                    {post.title}
+                  </h3>
+                </Link>
+                <p className="text-gray-400 text-sm line-clamp-2 mb-3">
+                  {post.description}
+                </p>
+
+                {post.type === "event" && post.date && (
+                  <div className="flex items-center text-xs text-gray-400 mb-2">
+                    <Calendar className="w-3 h-3 mr-1 text-[#ffcc00]" />
+                    <span>
+                      {new Date(post.date).toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
                   </div>
                 )}
 
-                <div className="p-4">
-                  <Link href={`/${post.type}s/${post.id}`}>
-                    <h3 className="text-white font-semibold mb-2 hover:text-[#ffcc00] transition-colors">
-                      {post.title}
-                    </h3>
-                  </Link>
-                  <p className="text-gray-400 text-sm line-clamp-2 mb-3">
-                    {post.description}
-                  </p>
+                {post.location && (
+                  <div className="flex items-center text-xs text-gray-400 mb-2">
+                    <MapPin className="w-3 h-3 mr-1 text-[#ffcc00]" />
+                    <span>{post.location}</span>
+                  </div>
+                )}
 
-                  {post.type === "event" && post.date && (
-                    <div className="flex items-center text-sm text-gray-400 mb-2">
-                      <CalendarDays className="w-4 h-4 mr-2 text-[#ffcc00]" />
+                <div className="text-xs text-gray-500 mt-2">
+                  {formatDate(post.createdAt)}
+                </div>
+              </CardContent>
+              <CardFooter className="border-t border-[#333333] p-3 flex justify-between">
+                <div className="flex space-x-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white hover:bg-[#252525] p-1"
+                    onClick={() => handleLikePost(post.id)}
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${
+                        likedPosts.includes(post.id)
+                          ? "fill-[#ffcc00] text-[#ffcc00]"
+                          : ""
+                      }`}
+                    />
+                  </Button>
+                  <Link href={`/${post.type}s/${post.id}`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-white hover:bg-[#252525] p-1"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-white hover:bg-[#252525] p-1"
+                  onClick={() => handleSavePost(post.id)}
+                >
+                  <Bookmark
+                    className={`w-4 h-4 ${
+                      savedPosts.includes(post.id)
+                        ? "fill-[#ffcc00] text-[#ffcc00]"
+                        : ""
+                    }`}
+                  />
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredPosts.map((post) => (
+            <Card
+              key={post.id}
+              className="bg-[#1a1a1a] border-[#333333] overflow-hidden hover:border-[#444444] transition-colors"
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center mb-3">
+                  <Link
+                    href={`/users/${post.user.username}`}
+                    className="flex items-center"
+                  >
+                    <Avatar className="h-10 w-10 border border-[#333333]">
+                      {post.user.image ? (
+                        <Image
+                          src={post.user.image || "/placeholder.svg"}
+                          alt={post.user.username}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-[#333333] text-white">
+                          {post.user.username?.charAt(0).toUpperCase() || "U"}
+                        </div>
+                      )}
+                    </Avatar>
+                    <div className="ml-3">
+                      <p className="text-white font-medium">
+                        @{post.user.username}
+                      </p>
+                      <p className="text-gray-400 text-xs">
+                        {formatDate(post.createdAt)}
+                      </p>
+                    </div>
+                  </Link>
+                  <Badge className="ml-auto bg-[#252525] text-[#ffcc00] hover:bg-[#252525]">
+                    {post.type}
+                  </Badge>
+                </div>
+
+                <Link href={`/${post.type}s/${post.id}`}>
+                  <h3 className="text-white text-lg font-semibold mb-2 hover:text-[#ffcc00] transition-colors">
+                    {post.title}
+                  </h3>
+                </Link>
+
+                <p className="text-gray-400 text-sm mb-4">
+                  {post.description.length > 150
+                    ? `${post.description.substring(0, 150)}...`
+                    : post.description}
+                </p>
+
+                {post.type === "event" && post.date && (
+                  <div>
+                    <div className="flex items-center text-sm text-gray-400 mb-3">
+                      <Calendar className="w-4 h-4 mr-2 text-[#ffcc00]" />
                       <span>
                         {new Date(post.date).toLocaleDateString(undefined, {
                           weekday: "short",
@@ -199,184 +345,96 @@ export default function ProfileContent({
                         })}
                       </span>
                     </div>
-                  )}
-
-                  {post.location && (
-                    <div className="flex items-center text-sm text-gray-400 mb-2">
-                      <MapPin className="w-4 h-4 mr-2 text-[#ffcc00]" />
-                      <span>{post.location}</span>
-                    </div>
-                  )}
-
-                  <div className="text-xs text-gray-500 mt-2">
-                    {formatDate(post.createdAt)}
-                  </div>
-                </div>
-
-                <div className="border-t border-[#333333] p-3 flex justify-between">
-                  <div className="flex space-x-3">
-                    <button
-                      className="text-gray-400 hover:text-white"
-                      onClick={() => handleLikePost(post.id)}
-                    >
-                      <Heart
-                        className={`w-5 h-5 ${
-                          likedPosts.includes(post.id)
-                            ? "fill-[#ffcc00] text-[#ffcc00]"
-                            : ""
-                        }`}
-                      />
-                    </button>
-                    <Link
-                      href={`/${post.type}s/${post.id}`}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      <MessageSquare className="w-5 h-5" />
-                    </Link>
-                  </div>
-                  <button
-                    className="text-gray-400 hover:text-white"
-                    onClick={() => handleSavePost(post.id)}
-                  >
-                    <Bookmark
-                      className={`w-5 h-5 ${
-                        savedPosts.includes(post.id)
-                          ? "fill-[#ffcc00] text-[#ffcc00]"
-                          : ""
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {filteredPosts.map((post) => (
-              <div
-                key={post.id}
-                className="bg-[#252525]/90 backdrop-blur-sm rounded-lg overflow-hidden border border-[#333333] hover:border-[#444444] transition-all duration-200"
-              >
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <Link href={`/${post.type}s/${post.id}`}>
-                        <h3 className="text-white font-semibold hover:text-[#ffcc00] transition-colors">
-                          {post.title}
-                        </h3>
-                      </Link>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge className="bg-[#333333] text-[#ffcc00] hover:bg-[#333333]">
-                          {post.type}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          {formatDate(post.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {post.images && post.images.length > 0 && (
-                      <div className="relative h-16 w-16 rounded-md overflow-hidden">
-                        <Image
-                          src={
-                            post.images[0] ||
-                            "/placeholder.svg?height=64&width=64" ||
-                            "/placeholder.svg"
-                          }
-                          alt={post.title}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-gray-400 text-sm mb-3">
-                    {post.description.length > 200
-                      ? `${post.description.substring(0, 200)}...`
-                      : post.description}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {post.type === "event" && post.date && (
-                      <div className="flex items-center text-sm text-gray-400">
-                        <CalendarDays className="w-4 h-4 mr-1 text-[#ffcc00]" />
-                        <span>
-                          {new Date(post.date).toLocaleDateString(undefined, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    )}
-
-                    {post.location && (
-                      <div className="flex items-center text-sm text-gray-400">
-                        <MapPin className="w-4 h-4 mr-1 text-[#ffcc00]" />
-                        <span>{post.location}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {post.tags && post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {post.tags.map((tag, index) => (
-                        <Badge
-                          key={index}
-                          className="bg-[#252525] text-gray-300 hover:bg-[#333333]"
-                        >
-                          #{tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-[#333333] p-3 flex justify-between">
-                  <div className="flex space-x-3">
-                    <button
-                      className="text-gray-400 hover:text-white flex items-center gap-1"
-                      onClick={() => handleLikePost(post.id)}
-                    >
-                      <Heart
-                        className={`w-5 h-5 ${
-                          likedPosts.includes(post.id)
-                            ? "fill-[#ffcc00] text-[#ffcc00]"
-                            : ""
-                        }`}
-                      />
-                      <span className="text-sm">Like</span>
-                    </button>
-                    <Link
-                      href={`/${post.type}s/${post.id}`}
-                      className="text-gray-400 hover:text-white flex items-center gap-1"
-                    >
-                      <MessageSquare className="w-5 h-5" />
-                      <span className="text-sm">
-                        {post.commentCount > 0 ? post.commentCount : ""} Comment
-                        {post.commentCount !== 1 ? "s" : ""}
+                    <div className="flex items-center text-sm text-gray-400 mb-3">
+                      <Clock className="w-4 h-4 mr-2 text-[#ffcc00]" />
+                      <span>
+                        {new Date(post.date).toLocaleTimeString(undefined, {
+                          hour12: true,
+                        })}
                       </span>
-                    </Link>
+                    </div>
                   </div>
-                  <button
-                    className="text-gray-400 hover:text-white"
-                    onClick={() => handleSavePost(post.id)}
+                )}
+
+                {post.location && (
+                  <div className="flex items-center text-sm text-gray-400 mb-3">
+                    <MapPin className="w-4 h-4 mr-2 text-[#ffcc00]" />
+                    <span>{post.location}</span>
+                  </div>
+                )}
+
+                {post.images && post.images.length > 0 && (
+                  <div className="relative h-64 w-full rounded-lg overflow-hidden mb-4">
+                    <Image
+                      src={getPostImage(post) || "/placeholder.svg"}
+                      alt={post.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+
+                {post.tags && post.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {post.tags.map((tag, index) => (
+                      <Badge
+                        key={index}
+                        className="bg-[#252525] text-gray-300 hover:bg-[#333333]"
+                      >
+                        #{tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+
+              <CardFooter className="border-t border-[#333333] p-3 flex justify-between">
+                <div className="flex space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white hover:bg-[#252525]"
+                    onClick={() => handleLikePost(post.id)}
                   >
-                    <Bookmark
-                      className={`w-5 h-5 ${
-                        savedPosts.includes(post.id)
+                    <Heart
+                      className={`w-5 h-5 mr-2 ${
+                        likedPosts.includes(post.id)
                           ? "fill-[#ffcc00] text-[#ffcc00]"
                           : ""
                       }`}
                     />
-                  </button>
+                    <span>Like</span>
+                  </Button>
+                  <Link href={`/${post.type}s/${post.id}`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-white hover:bg-[#252525]"
+                    >
+                      <MessageSquare className="w-5 h-5 mr-2" />
+                      <span>Comment</span>
+                    </Button>
+                  </Link>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-white hover:bg-[#252525]"
+                  onClick={() => handleSavePost(post.id)}
+                >
+                  <Bookmark
+                    className={`w-5 h-5 ${
+                      savedPosts.includes(post.id)
+                        ? "fill-[#ffcc00] text-[#ffcc00]"
+                        : ""
+                    }`}
+                  />
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
