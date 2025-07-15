@@ -46,6 +46,7 @@ const Navbar = dynamic(() => import("../../dashboard/_components/Navbar"), {
 import ProfileHeader from "./_components/ProfileHeader";
 import ProfileContent, { ProfilePost } from "./_components/ProfileContent";
 import Post, { Event, ExtendedPost, Project } from "@/types/posts";
+import { SearchDialog } from "@/components/ui/search-dialog";
 
 // Fetcher function
 // const fetcher = (url: string) =>
@@ -283,17 +284,13 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
             </div>
 
             {/* Search Bar */}
-            <div className="hidden md:flex flex-1 justify-center">
-              <div className="relative w-full max-w-md">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#252525] border border-[#333333] rounded-full px-4 py-2 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#ffcc00]/50"
-                />
-              </div>
-            </div>
+            {/* Search Bar */}
+                    <div className="hidden md:flex flex-1 justify-center">
+                      <div className="relative w-full max-w-md">
+                        <SearchDialog />
+                      </div>
+                    </div>
+            
 
             <div className="flex items-center gap-2 flex-1 justify-end">
               {/* Navigation buttons can be added here */}
