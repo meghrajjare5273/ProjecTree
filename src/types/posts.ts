@@ -28,6 +28,7 @@ export type ExtendedProject = {
   tags: string[];
   createdAt: Date;
   commentCount: number;
+  user: User;
 };
 
 // Custom type for fetched events
