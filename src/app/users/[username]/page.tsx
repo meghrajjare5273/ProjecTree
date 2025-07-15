@@ -284,13 +284,11 @@ export default function UserProfilePage({ params }: ProfilePageProps) {
             </div>
 
             {/* Search Bar */}
-            {/* Search Bar */}
-                    <div className="hidden md:flex flex-1 justify-center">
-                      <div className="relative w-full max-w-md">
-                        <SearchDialog />
-                      </div>
-                    </div>
-            
+            <div className="hidden md:flex flex-1 justify-center">
+              <div className="relative w-full max-w-md">
+                <SearchDialog />
+              </div>
+            </div>
 
             <div className="flex items-center gap-2 flex-1 justify-end">
               {/* Navigation buttons can be added here */}
