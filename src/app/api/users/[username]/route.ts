@@ -8,6 +8,7 @@ export async function GET(
   const { username } = await params;
 
   try {
+    // Single optimized query with all needed data
     const user = await prisma.user.findUnique({
       where: {
         username: username,
@@ -15,28 +16,32 @@ export async function GET(
       include: {
         projects: {
           include: {
-            comments: {
-              include: {
-                user: { select: { username: true, image: true } },
+            _count: {
+              select: {
+                comments: true,
               },
             },
           },
           orderBy: { createdAt: "desc" },
+          take: 20, // Limit initial load
         },
         events: {
           include: {
-            comments: {
-              include: {
-                user: { select: { username: true, image: true } },
+            _count: {
+              select: {
+                comments: true,
               },
             },
           },
           orderBy: { createdAt: "desc" },
+          take: 20, // Limit initial load
         },
         _count: {
           select: {
             followers: true,
             following: true,
+            projects: true,
+            events: true,
           },
         },
       },
@@ -45,8 +50,16 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    // console.log(user);
-    return NextResponse.json({ data: user }, { status: 200 });
+
+    return NextResponse.json(
+      { data: user },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching user profile:", error);
     return NextResponse.json(
