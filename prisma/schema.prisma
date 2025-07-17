@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
   provider        = "prisma-client-js"
@@ -40,31 +35,20 @@ model User {
   followers        Follow[]  @relation("FollowsAsFollowing")
 
   @@unique([username])
-  @@index([username, email, id])
+  // Optimized indexes for common queries
+  @@index([username, email]) // For login and profile lookups
+  @@index([email]) // For email-based authentication
+  @@index([createdAt]) // For user registration analytics
+  @@index([username, createdAt]) // For user discovery and sorting
   @@map("user")
-}
-
-model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  eventId   String?
-  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
-  @@index([id, userId, createdAt])
-  @@map("comment")
 }
 
 model Project {
   id                   String    @id @default(cuid())
   title                String
   description          String
-  images               String[] // Array of image URLs
-  tags                 String[] // e.g., ["web", "AI", "hackathon"]
+  images               String[]
+  tags                 String[]
   userId               String
   openForCollaboration Boolean   @default(false)
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -72,7 +56,12 @@ model Project {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  @@index([userId, id, createdAt])
+  // Optimized indexes for project queries
+  @@index([userId, createdAt]) // For user's projects timeline
+  @@index([createdAt, id]) // For global project feed
+  @@index([tags]) // For tag-based searches using GIN index
+  @@index([userId, updatedAt]) // For user's recent activity
+  @@index([openForCollaboration, createdAt]) // For collaboration discovery
   @@map("project")
 }
 
@@ -90,10 +79,69 @@ model Event {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@index([id, userId, createdAt])
+  // Optimized indexes for event queries
+  @@index([userId, createdAt]) // For user's events timeline
+  @@index([date, createdAt]) // For upcoming events
+  @@index([location, date]) // For location-based event discovery
+  @@index([createdAt, id]) // For global events feed
   @@map("event")
 }
 
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  eventId   String?
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  // Optimized indexes for comment queries
+  @@index([projectId, createdAt]) // For project comments
+  @@index([eventId, createdAt]) // For event comments
+  @@index([userId, createdAt]) // For user's comments
+  @@map("comment")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("FollowsAsFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("FollowsAsFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  // Optimized indexes for follow queries
+  @@index([followerId, createdAt]) // For following list
+  @@index([followingId, createdAt]) // For followers list
+  @@index([followingId]) // For follower count queries
+  @@index([followerId]) // For following count queries
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  content    String
+  senderId   String
+  receiverId String
+  createdAt  DateTime @default(now())
+  read       Boolean  @default(false)
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  // Optimized indexes for message queries
+  @@index([senderId, receiverId, createdAt]) // For conversation history
+  @@index([receiverId, read, createdAt]) // For unread messages
+  @@index([senderId, createdAt]) // For sent messages
+  @@index([receiverId, createdAt]) // For received messages
+  @@map("message")
+}
+
+// Session, Account, and Verification models remain the same with existing indexes
 model Session {
   id        String   @id
   expiresAt DateTime
@@ -106,7 +154,7 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
-  @@index([userId, id])
+  @@index([userId, expiresAt]) // For active sessions
   @@map("session")
 }
 
@@ -126,7 +174,7 @@ model Account {
   createdAt             DateTime
   updatedAt             DateTime
 
-  @@index([id])
+  @@index([userId, providerId]) // For user accounts lookup
   @@map("account")
 }
 
@@ -138,35 +186,6 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 
-  @@index([id])
+  @@index([identifier, expiresAt]) // For verification lookups
   @@map("verification")
-}
-
-model Message {
-  id         String   @id @default(cuid())
-  content    String
-  senderId   String
-  receiverId String
-  createdAt  DateTime @default(now())
-  read       Boolean  @default(false)
-
-  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-
-  @@index([senderId, receiverId, createdAt])
-  @@map("message")
-}
-
-model Follow {
-  id          String   @id @default(cuid())
-  followerId  String
-  followingId String
-  createdAt   DateTime @default(now())
-
-  follower  User @relation("FollowsAsFollower", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("FollowsAsFollowing", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
 }
