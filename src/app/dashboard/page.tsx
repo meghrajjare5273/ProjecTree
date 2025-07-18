@@ -1,19 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 import { authClient } from "@/lib/auth-client";
 import type User from "@/types/users";
 import type Post from "@/types/posts";
 import type { Event, Project } from "@/types/posts";
-
-// Components
-// import Navbar from "./_components/Navbar";
-// import MainContent from "./_components/MainContent";
-// import RightSidebar from "./_components/RightSidebar";
-// import LeftSidebar from "./_components/LeftSidebar";
-// Icons
 import { Menu, X } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -28,63 +21,242 @@ const MainContent = dynamic(() => import("./_components/MainContent"), {
 });
 const Navbar = dynamic(() => import("./_components/Navbar"), { ssr: false });
 
-// Fetcher function for SWR
-const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then((res) => res.json());
+const PAGE_SIZE = 10;
 
-// export const revalidate = 3600;
+interface PaginationData {
+  hasMore: boolean;
+  lastId: string | null;
+  totalCount?: number;
+}
+
+interface APIResponse {
+  data: any[];
+  pagination: PaginationData;
+}
 
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<
+    "all" | "projects" | "events" | "saved"
+  >("all");
   const [savedPosts, setSavedPosts] = useState<string[]>([]);
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch data using SWR
-  const { data: profileData, error: profileError } = useSWR(
-    "/api/profile",
-    fetcher
-  );
-  const { data: projectsData, error: projectsError } = useSWR(
-    "/api/projects",
-    fetcher
-  );
-  const { data: eventsData, error: eventsError } = useSWR(
-    "/api/events",
-    fetcher
-  );
+  // Data state
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check session and redirect if not authenticated
+  // Pagination state
+  const [projectsPagination, setProjectsPagination] = useState<PaginationData>({
+    hasMore: true,
+    lastId: null,
+  });
+  const [eventsPagination, setEventsPagination] = useState<PaginationData>({
+    hasMore: true,
+    lastId: null,
+  });
+
+  // Check session
   useEffect(() => {
     const checkSession = async () => {
       const session = await authClient.getSession();
       if (!session) {
         router.push("/auth?mode=signin");
+        return;
+      }
+
+      // Fetch user profile
+      try {
+        const profileResponse = await fetch("/api/profile", {
+          credentials: "include",
+        });
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          setUser(profileData.user);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile:", error);
       }
     };
     checkSession();
   }, [router]);
 
-  // Set user data when profile data is available
-  useEffect(() => {
-    if (profileData) {
-      setUser(profileData.user);
-    }
-  }, [profileData]);
+  const loadProjects = useCallback(async (reset = false) => {
+    const lastId = reset ? null : projectsPagination.lastId;
 
-  // Simulate saved and liked posts (would come from API in real app)
+    try {
+      const params = new URLSearchParams({
+        limit: PAGE_SIZE.toString(),
+        ...(lastId && { lastId }),
+      });
+
+      const response = await fetch(`/api/projects?${params}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch projects");
+
+      const data: APIResponse = await response.json();
+
+      const transformedProjects = data.data.map((p: Project) => ({
+        ...p,
+        type: "project",
+      }));
+
+      if (reset) {
+        setAllPosts((prev: any) => [
+          ...transformedProjects,
+          ...prev.filter((post: any) => post.type === "event"),
+        ]);
+      } else {
+        setAllPosts((prev: any) => [
+          ...prev.filter((post: any) => post.type === "event"),
+          ...prev.filter((post: any) => post.type === "project"),
+          ...transformedProjects,
+        ]);
+      }
+
+      setProjectsPagination(data.pagination);
+    } catch (error) {
+      console.error("Failed to load projects:", error);
+      throw error;
+    }
+  },[projectsPagination.lastId]);
+
+  const loadEvents = useCallback(async (reset = false) => {
+    const lastId = reset ? null : eventsPagination.lastId;
+
+    try {
+      const params = new URLSearchParams({
+        limit: PAGE_SIZE.toString(),
+        ...(lastId && { lastId }),
+      });
+
+      const response = await fetch(`/api/events?${params}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch events");
+
+      const data: APIResponse = await response.json();
+
+      const transformedEvents = data.data.map((e: Event) => ({
+        ...e,
+        type: "event",
+      }));
+
+      if (reset) {
+        setAllPosts((prev: any) => [
+          ...prev.filter((post: any) => post.type === "project"),
+          ...transformedEvents,
+        ]);
+      } else {
+        setAllPosts((prev: any) => [
+          ...prev.filter((post: any) => post.type === "project"),
+          ...prev.filter((post: any) => post.type === "event"),
+          ...transformedEvents,
+        ]);
+      }
+
+      setEventsPagination(data.pagination);
+    } catch (error) {
+      console.error("Failed to load events:", error);
+      throw error;
+    }
+  },[eventsPagination.lastId]);
+  
+  // Fetch initial data
   useEffect(() => {
-    // Simulated saved and liked posts
-    const mockSaved = ["1", "3", "5"];
-    const mockLiked = ["2", "4", "6"];
-    setSavedPosts(mockSaved);
-    setLikedPosts(mockLiked);
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      setError(null);
+  
+      try {
+        await Promise.all([loadProjects(true), loadEvents(true)]);
+      } catch (error) {
+        console.error("Failed to load initial data:", error);
+        setError("Failed to load data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (user) {
+      loadInitialData();
+    }
+  }, [loadEvents, loadProjects, user]);
+
+
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+
+    try {
+      const promises = [];
+
+      if (activeTab === "all" || activeTab === "projects") {
+        if (projectsPagination.hasMore) {
+          promises.push(loadProjects(false));
+        }
+      }
+
+      if (activeTab === "all" || activeTab === "events") {
+        if (eventsPagination.hasMore) {
+          promises.push(loadEvents(false));
+        }
+      }
+
+      await Promise.all(promises);
+
+      // Update hasMore based on both pagination states
+      const stillHasMore =
+        (activeTab === "all" &&
+          (projectsPagination.hasMore || eventsPagination.hasMore)) ||
+        (activeTab === "projects" && projectsPagination.hasMore) ||
+        (activeTab === "events" && eventsPagination.hasMore);
+
+      setHasMore(stillHasMore);
+    } catch (error) {
+      console.error("Failed to load more:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, activeTab, projectsPagination.hasMore, eventsPagination.hasMore, loadProjects, loadEvents]);
+
+  // Filter posts based on active tab and search
+  const filteredPosts = allPosts
+    .filter((post) => {
+      if (activeTab === "projects") return post.type === "project";
+      if (activeTab === "events") return post.type === "event";
+      if (activeTab === "saved") return savedPosts.includes(post.id);
+      return true; // "all" tab
+    })
+    .filter((post) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        post.title.toLowerCase().includes(query) ||
+        post.description.toLowerCase().includes(query)
+      );
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+  // Mock saved and liked posts
+  useEffect(() => {
+    setSavedPosts(["1", "3", "5"]);
+    setLikedPosts(["2", "4", "6"]);
   }, []);
 
-  // Toggle save post
   const handleSavePost = useCallback((postId: string) => {
     setSavedPosts((prev) =>
       prev.includes(postId)
@@ -93,7 +265,6 @@ export default function Dashboard() {
     );
   }, []);
 
-  // Toggle like post
   const handleLikePost = useCallback((postId: string) => {
     setLikedPosts((prev) =>
       prev.includes(postId)
@@ -102,60 +273,14 @@ export default function Dashboard() {
     );
   }, []);
 
-  // Toggle mobile sidebar
   const toggleMobileSidebar = () => {
     setMobileSidebarOpen(!mobileSidebarOpen);
   };
 
-  // Close mobile sidebar when clicking on a link
   const closeMobileSidebar = () => {
     setMobileSidebarOpen(false);
   };
 
-  // Combine and sort posts
-  const allPosts = useMemo(() => {
-    return (projectsData?.data || [])
-      .map((p: Project) => ({ ...p, type: "project" }))
-      .concat(
-        (eventsData?.data || []).map((e: Event) => ({ ...e, type: "event" }))
-      )
-      .sort(
-        (a: Post, b: Post) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-  }, [projectsData, eventsData]);
-
-  // Filtered posts based on tab
-  const filteredPosts = useMemo(() => {
-    let posts = allPosts;
-
-    // Filter by tab
-    if (activeTab === "projects") {
-      posts = posts.filter((post: Project) => post.type === "project");
-    } else if (activeTab === "events") {
-      posts = posts.filter((post: Event) => post.type === "event");
-    } else if (activeTab === "saved") {
-      posts = posts.filter((post: Post) => savedPosts.includes(post.id));
-    }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      posts = posts.filter(
-        (post: Post) =>
-          post.title.toLowerCase().includes(query) ||
-          post.description.toLowerCase().includes(query)
-      );
-    }
-
-    return posts;
-  }, [allPosts, activeTab, savedPosts, searchQuery]);
-
-  // Handle loading state
-  const isLoading = !profileData || !projectsData || !eventsData;
-  const hasError = profileError || projectsError || eventsError;
-
-  // Trending topics (simulated)
   const trendingTopics = [
     "Hackathon",
     "AI Projects",
@@ -183,7 +308,7 @@ export default function Dashboard() {
             : "hidden"
         } md:hidden`}
         onClick={toggleMobileSidebar}
-      ></div>
+      />
 
       {/* Left Sidebar */}
       <LeftSidebar
@@ -206,7 +331,7 @@ export default function Dashboard() {
             {/* Main Feed */}
             <MainContent
               isLoading={isLoading}
-              error={!!hasError}
+              error={!!error}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               filteredPosts={filteredPosts}
@@ -216,6 +341,9 @@ export default function Dashboard() {
               likedPosts={likedPosts}
               handleSavePost={handleSavePost}
               handleLikePost={handleLikePost}
+              hasMore={hasMore}
+              loadMore={loadMore}
+              isLoadingMore={isLoadingMore}
             />
 
             {/* Right Sidebar */}
