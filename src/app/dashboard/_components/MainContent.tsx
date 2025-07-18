@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
@@ -23,8 +24,8 @@ import { Avatar } from "@/components/ui/avatar";
 interface MainContentProps {
   isLoading: boolean;
   error: boolean;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activeTab: "all" | "projects" | "events" | "saved";
+  setActiveTab: (tab: "all" | "projects" | "events" | "saved") => void; // Fixed: Remove array brackets
   filteredPosts: Post[];
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -32,6 +33,9 @@ interface MainContentProps {
   likedPosts: string[];
   handleSavePost: (postId: string) => void;
   handleLikePost: (postId: string) => void;
+  hasMore: boolean;
+  loadMore: () => void;
+  isLoadingMore: boolean;
 }
 
 export default function MainContent({
@@ -46,7 +50,40 @@ export default function MainContent({
   likedPosts,
   handleSavePost,
   handleLikePost,
+  hasMore,
+  loadMore,
+  isLoadingMore = false,
 }: MainContentProps) {
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMore &&
+          !isLoadingMore &&
+          !isLoading
+        ) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasMore, loadMore, isLoadingMore, isLoading]);
+
   // Format date
   const formatDate = (dateString: Date) => {
     return formatDistanceToNow(dateString, { addSuffix: true });
@@ -54,15 +91,9 @@ export default function MainContent({
 
   // Helper function to get post image safely
   const getPostImage = (post: Post) => {
-    // Check if images is an array and has items
     if (Array.isArray(post.images) && post.images.length > 0) {
       return post.images[0];
     }
-    // Check if image is directly on the post (might be the case for events)
-    else if (post.images) {
-      return post.images[1];
-    }
-    // Fallback to placeholder
     return "/placeholder.svg?height=256&width=512";
   };
 
@@ -83,46 +114,21 @@ export default function MainContent({
       {/* Tabs */}
       <div className="bg-[#1a1a1a] rounded-lg mb-6 overflow-hidden">
         <div className="flex overflow-x-auto scrollbar-hide">
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`px-4 py-3 flex-1 flex justify-center items-center ${
-              activeTab === "all"
-                ? "border-b-2 border-[#ffcc00] text-white"
-                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
-            }`}
-          >
-            <span>All Posts</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("projects")}
-            className={`px-4 py-3 flex-1 flex justify-center items-center ${
-              activeTab === "projects"
-                ? "border-b-2 border-[#ffcc00] text-white"
-                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
-            }`}
-          >
-            <span>Projects</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("events")}
-            className={`px-4 py-3 flex-1 flex justify-center items-center ${
-              activeTab === "events"
-                ? "border-b-2 border-[#ffcc00] text-white"
-                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
-            }`}
-          >
-            <span>Events</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("saved")}
-            className={`px-4 py-3 flex-1 flex justify-center items-center ${
-              activeTab === "saved"
-                ? "border-b-2 border-[#ffcc00] text-white"
-                : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
-            }`}
-          >
-            <span>Saved</span>
-          </button>
+          {(["all", "projects", "events", "saved"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-3 flex-1 flex justify-center items-center ${
+                activeTab === tab
+                  ? "border-b-2 border-[#ffcc00] text-white"
+                  : "text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
+              }`}
+            >
+              <span className="capitalize">
+                {tab === "all" ? "All Posts" : tab}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -151,24 +157,17 @@ export default function MainContent({
             >
               <div className="p-4">
                 <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse"></div>
+                  <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse" />
                   <div className="ml-3">
-                    <div className="h-4 w-24 bg-gray-700 animate-pulse mb-1"></div>
-                    <div className="h-3 w-16 bg-gray-700 animate-pulse"></div>
+                    <div className="h-4 w-24 bg-gray-700 animate-pulse mb-1" />
+                    <div className="h-3 w-16 bg-gray-700 animate-pulse" />
                   </div>
                 </div>
-                <div className="h-5 w-3/4 bg-gray-700 animate-pulse mb-2"></div>
-                <div className="h-4 w-full bg-gray-700 animate-pulse mb-1"></div>
-                <div className="h-4 w-5/6 bg-gray-700 animate-pulse mb-4"></div>
+                <div className="h-5 w-3/4 bg-gray-700 animate-pulse mb-2" />
+                <div className="h-4 w-full bg-gray-700 animate-pulse mb-1" />
+                <div className="h-4 w-5/6 bg-gray-700 animate-pulse mb-4" />
               </div>
-              <div className="h-40 bg-gray-700 animate-pulse"></div>
-              <div className="border-t border-[#333333] p-3 flex justify-between">
-                <div className="flex space-x-4">
-                  <div className="w-8 h-8 bg-gray-700 animate-pulse rounded"></div>
-                  <div className="w-8 h-8 bg-gray-700 animate-pulse rounded"></div>
-                </div>
-                <div className="w-8 h-8 bg-gray-700 animate-pulse rounded"></div>
-              </div>
+              <div className="h-40 bg-gray-700 animate-pulse" />
             </Card>
           ))}
         </div>
@@ -280,7 +279,6 @@ export default function MainContent({
                   </div>
                 )}
 
-                {/* Updated image display logic to handle both structures */}
                 {(post.images?.length > 0 || post.images) && (
                   <div className="relative h-64 w-full rounded-lg overflow-hidden mb-4">
                     <Image
@@ -353,6 +351,26 @@ export default function MainContent({
               </CardFooter>
             </Card>
           ))}
+
+          {/* Infinite scroll trigger */}
+          <div
+            ref={loadMoreRef}
+            className="h-10 flex items-center justify-center"
+          >
+            {isLoadingMore && (
+              <div className="flex items-center gap-2 text-gray-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#ffcc00]" />
+                <span>Loading more...</span>
+              </div>
+            )}
+          </div>
+
+          {/* End of results message */}
+          {!hasMore && filteredPosts.length > 0 && (
+            <div className="text-center py-8 text-gray-400">
+              <p>You&apos;ve reached the end of the feed</p>
+            </div>
+          )}
         </div>
       )}
     </div>
